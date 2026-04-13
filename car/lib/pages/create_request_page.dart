@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:car/services/translation_service.dart';
+import 'package:car/models/request_status.dart';
 
 class CreateRequestPage extends StatefulWidget {
   const CreateRequestPage({super.key});
@@ -35,14 +36,14 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
       
       if (fromDetail) {
         // Pre-fill from car info
-        final double price = (args['price'] ?? 0).toDouble();
+        final double price = (args['final_price'] ?? 0).toDouble();
         _currentRangeValues = RangeValues(
           price > 5000000 ? price - 5000000 : price,
           price + 5000000,
         );
-        selectedCondition = args['car_condition'] ?? args['condition'] ?? 'Used';
+        selectedCondition = (args['car_condition'] ?? args['condition'] ?? 'Used').toString();
         
-        String make = args['make'] ?? args['name'] ?? 'brand';
+        String make = (args['make'] ?? args['name'] ?? 'brand').toString();
         // Handle variations in naming
         if (make.toLowerCase().contains('land rover')) make = 'Land Rover';
         if (make.toLowerCase().contains('mercedes')) make = 'Mercedes‑Benz';
@@ -50,7 +51,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         if (make.toLowerCase().contains('rolls royce')) make = 'Rolls‑Royce';
         
         selectedMake = make;
-        _modelController.text = args['model'] ?? '';
+        _modelController.text = (args['model'] ?? '').toString();
         
         final year = args['year']?.toString();
         if (year != null) {
@@ -67,18 +68,18 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           }
         }
         
-        selectedMileage = args['mileage'] ?? '0 - 10,000 km';
+        selectedMileage = (args['mileage'] ?? '0 - 10,000 km').toString();
       } else {
         // Standard edit mode
         _currentRangeValues = RangeValues(
           (args['budget_min'] ?? 25000000).toDouble(),
           (args['budget_max'] ?? 75000000).toDouble(),
         );
-        selectedCondition = args['car_condition'] ?? 'New';
-        selectedMake = args['make'] ?? 'brand';
-        _modelController.text = args['model'] ?? '';
-        _requirementsController.text = args['special_requirements'] ?? '';
-        selectedMileage = args['mileage'] ?? '0 - 10,000 km';
+        selectedCondition = (args['car_condition'] ?? 'New').toString();
+        selectedMake = (args['make'] ?? 'brand').toString();
+        _modelController.text = (args['model'] ?? '').toString();
+        _requirementsController.text = (args['special_requirements'] ?? '').toString();
+        selectedMileage = (args['mileage'] ?? '0 - 10,000 km').toString();
         
         if (args['year_min'] != null && args['year_max'] != null) {
           selectedYear = '${args['year_min']} - ${args['year_max']}';
@@ -243,7 +244,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         'mileage': selectedCondition == 'New' ? '0' : selectedMileage,
         'exterior_color': colorNames[selectedColor]?[ts.currentLanguage] ?? 'Custom',
         'special_requirements': _requirementsController.text.trim(),
-        'status': 'initialisée',
+        'status': RequestStatus.initiated.dbValue,
       };
 
       if (_editingRequest != null) {
@@ -492,6 +493,11 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   }
 
   Widget _buildVehicleIdentity(Color primaryColor, Color mutedForeground, TranslationService ts) {
+    final List<String> makes = ['brand', 'Audi', 'Bentley', 'BMW', 'BYD', 'Cadillac', 'Chevrolet', 'Chrysler', 'Citroën', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 'Geely', 'GMC', 'Honda', 'Hyundai', 'Isuzu', 'Jaguar', 'Jeep', 'Kia', 'Lamborghini', 'Land Rover', 'Lexus', 'Mahindra', 'Mazda', 'Mercedes‑Benz', 'Mini', 'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche', 'Range Rover', 'Renault', 'Rolls‑Royce', 'Subaru', 'Suzuki', 'Tata Motors', 'Tesla', 'Toyota', 'Volkswagen'];
+    if (!makes.contains(selectedMake)) {
+      makes.insert(0, selectedMake);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -503,7 +509,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
               child: _buildDropdownField(
                 ts.translate('make'),
                 selectedMake,
-                ['brand', 'Audi', 'Bentley', 'BMW', 'BYD', 'Cadillac', 'Chevrolet', 'Chrysler', 'Citroën', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 'Geely', 'GMC', 'Honda', 'Hyundai', 'Isuzu', 'Jaguar', 'Jeep', 'Kia', 'Lamborghini', 'Land Rover', 'Lexus', 'Mahindra', 'Mazda', 'Mercedes‑Benz', 'Mini', 'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche', 'Range Rover', 'Renault', 'Rolls‑Royce', 'Subaru', 'Suzuki', 'Tata Motors', 'Tesla', 'Toyota', 'Volkswagen'],
+                makes,
                 onChanged: (val) => setState(() => selectedMake = val!),
               ),
             ),
@@ -658,6 +664,12 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   Widget _buildMileageRange(Color primaryColor, Color mutedForeground, TranslationService ts) {
     bool isNew = selectedCondition == 'New';
+    final List<String> mileageOptions = ['0 km', '0 - 10,000 km', '10,000 - 30,000 km', '30,000 - 60,000 km', '60,000+ km'];
+    String currentVal = isNew ? '0 km' : selectedMileage;
+    if (!mileageOptions.contains(currentVal)) {
+      mileageOptions.insert(0, currentVal);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -665,14 +677,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         const SizedBox(height: 16),
         _buildDropdownField(
           '',
-          isNew ? '0 km' : selectedMileage,
-          const [
-            '0 km',
-            '0 - 10,000 km',
-            '10,000 - 30,000 km',
-            '30,000 - 60,000 km',
-            '60,000+ km'
-          ],
+          currentVal,
+          mileageOptions,
           icon: Icons.speed_rounded,
           enabled: !isNew,
           onChanged: (val) => setState(() => selectedMileage = val!),

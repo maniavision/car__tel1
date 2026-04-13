@@ -15,8 +15,10 @@ import 'package:car/pages/request_details_page.dart';
 import 'package:car/pages/car_details_page.dart';
 import 'package:car/pages/how_it_works_page.dart';
 import 'package:car/pages/trending_cars_page.dart';
+import 'package:car/pages/car_deals_page.dart';
 import 'package:car/pages/signup_page.dart';
 import 'package:car/pages/login_page.dart';
+import 'package:car/pages/leave_review_page.dart';
 import 'package:car/services/translation_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -71,8 +73,10 @@ class MyApp extends StatelessWidget {
             '/car-details': (context) => const CarDetailsPage(),
             '/how-it-works': (context) => const HowItWorksPage(),
             '/trending': (context) => const TrendingCarsPage(),
+            '/deals': (context) => const CarDealsPage(),
             '/signup': (context) => const SignUpPage(),
             '/login': (context) => const LoginPage(),
+            '/leave-review': (context) => const LeaveReviewPage(),
           },
         );
       },

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:car/widgets/bottom_nav.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:car/models/request_status.dart';
 
 class RequestsPage extends StatefulWidget {
   const RequestsPage({super.key});
@@ -32,7 +33,7 @@ class _RequestsPageState extends State<RequestsPage> {
       final response = await Supabase.instance.client
           .schema('cartel')
           .from('requests')
-          .select()
+          .select('*, agents(name, avatar_url)')
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
 
@@ -52,8 +53,99 @@ class _RequestsPageState extends State<RequestsPage> {
     }
   }
 
+  Future<void> _deleteRequest(dynamic requestId) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      debugPrint('Tentative de suppression de la demande ID: $requestId (type: ${requestId.runtimeType}) pour l\'utilisateur: ${user.id}');
+      
+      // Tentative 1: ID tel quel
+      var response = await Supabase.instance.client
+          .schema('cartel')
+          .from('requests')
+          .delete()
+          .eq('id', requestId)
+          .eq('user_id', user.id)
+          .select();
+      
+      // Tentative 2: ID en entier si échec et convertible
+      if (response.isEmpty) {
+        final intId = int.tryParse(requestId.toString());
+        if (intId != null && intId.toString() != requestId.toString()) {
+          debugPrint('Nouvelle tentative avec ID entier: $intId');
+          response = await Supabase.instance.client
+              .schema('cartel')
+              .from('requests')
+              .delete()
+              .eq('id', intId)
+              .eq('user_id', user.id)
+              .select();
+        }
+      }
+
+      // Tentative 3: ID en chaîne si échec
+      if (response.isEmpty) {
+        final stringId = requestId.toString();
+        if (stringId != requestId.toString()) { // avoid redundant check
+           // already tried in Attempt 1 if it was string
+        } else {
+          debugPrint('Nouvelle tentative avec ID stringifié: $stringId');
+          response = await Supabase.instance.client
+              .schema('cartel')
+              .from('requests')
+              .delete()
+              .eq('id', stringId)
+              .eq('user_id', user.id)
+              .select();
+        }
+      }
+
+      if (response.isEmpty) {
+        debugPrint('AUCUNE LIGNE SUPPRIMÉE. Vérifiez l\'ID $requestId et le user_id ${user.id} dans la table cartel.requests');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: Impossible de supprimer la demande #$requestId. RLS ou ID incorrect.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          _fetchRequests(); 
+        }
+        return;
+      }
+
+      debugPrint('Suppression réussie: $response');
+      if (mounted) {
+        setState(() {
+          _requests.removeWhere((r) => r['id'].toString() == requestId.toString());
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Demande supprimée avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Exception lors de la suppression: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur critique: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        _fetchRequests();
+      }
+    }
+  }
+
   String _formatDate(DateTime date) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final monthsFr = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+    final months = ts.currentLanguage == 'English' ? monthsEn : monthsFr;
     return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]}';
   }
 
@@ -61,7 +153,6 @@ class _RequestsPageState extends State<RequestsPage> {
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFFD4AF37);
     const backgroundColor = Color(0xFF0A0A0A);
-    const cardColor = Color(0xFF141414);
     const borderColor = Color(0xFF2A2A2A);
     const mutedForeground = Color(0xFFA3A3A3);
 
@@ -77,12 +168,16 @@ class _RequestsPageState extends State<RequestsPage> {
         
         selectedFilter ??= filters[0];
 
-        final activeCount = _requests.where((r) => r['status'] != 'terminée').length;
+        final activeCount = _requests.where((r) {
+          final s = RequestStatusExtension.fromString(r['status']?.toString() ?? '');
+          return s != RequestStatus.complete;
+        }).length;
 
         return Scaffold(
           backgroundColor: backgroundColor,
           extendBody: true,
           body: SafeArea(
+            bottom: false,
             child: Column(
               children: [
                 _buildHeader(primaryColor, borderColor, ts, activeCount),
@@ -94,49 +189,120 @@ class _RequestsPageState extends State<RequestsPage> {
                           ? Center(
                               child: Text(
                                 ts.translate('no_requests_found'),
-                                style: GoogleFonts.dmSans(color: mutedForeground),
+                                style: GoogleFonts.plusJakartaSans(color: mutedForeground),
                               ),
                             )
                           : ListView.separated(
                               padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
                               itemCount: _filteredRequests().length,
                               separatorBuilder: (context, index) => const SizedBox(height: 24),
-                              itemBuilder: (context, index) {
+                                itemBuilder: (context, index) {
                                 final request = _filteredRequests()[index];
-                                final status = request['status'] ?? 'initialisée';
+                                final requestStatus = RequestStatusExtension.fromString(request['status']?.toString() ?? '');
+                                final status = request['status']?.toString().toLowerCase() ?? 'initialisée';
                                 final isFinished = status == 'terminee' || status == 'terminée';
                                 final isPulse = status == 'en cours' || status == 'en_cours';
+                                final agentData = request['agents'];
+                                final agentName = agentData?['name'] ?? 'Jean-Paul M.';
                                 
                                 String dateStr = '';
                                 try {
                                   final createdAt = DateTime.parse(request['created_at']);
-                                  dateStr = 'CarTel Request • ${_formatDate(createdAt)}';
+                                  dateStr = '${ts.translate('demande_cartel_aujourdhui').split('•').first} • ${_formatDate(createdAt)}';
                                 } catch (_) {
                                   dateStr = ts.translate('demande_cartel_aujourdhui');
                                 }
 
-                                return _buildRequestCard(
-                                  title: '${request['make']} ${request['model']}',
-                                  subtitle: dateStr,
-                                  status: ts.translate(status.toString().toLowerCase().replaceAll(' ', '_')),
-                                  id: '#${request['id'].toString().substring(0, 4).toUpperCase()}',
-                                  budget: ts.formatPrice((request['budget_max'] ?? 0).toDouble()),
-                                  agent: request['agent_id'] != null ? 'Agent Assigned' : ts.translate('attente_assignation_agent'),
-                                  paymentStatus: request['payment_status'],
-                                  step: status == 'initialisée' ? ts.translate('attente_assignation_agent') : ts.translate('identification_vehicules'),
-                                  icon: isFinished ? Icons.verified_user_rounded : (isPulse ? Icons.directions_car_rounded : Icons.receipt_long_rounded),
-                                  primaryColor: primaryColor,
-                                  borderColor: borderColor,
-                                  mutedForeground: mutedForeground,
-                                  isPulse: isPulse,
-                                  isFinished: isFinished,
-                                  onTap: () {
-                                    if ((status == 'initialisee' || status == 'initialisée') && (request['payment_status'] == 'pending' || request['payment_status'] == null)) {
-                                      Navigator.pushNamed(context, '/create-request', arguments: request);
-                                    } else {
-                                      Navigator.pushNamed(context, '/request-details', arguments: request);
-                                    }
+                                return Dismissible(
+                                  key: Key(request['id'].toString()),
+                                  direction: requestStatus == RequestStatus.initiated 
+                                      ? DismissDirection.endToStart 
+                                      : DismissDirection.none,
+                                  confirmDismiss: (direction) async {
+                                    return await showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        backgroundColor: const Color(0xFF141414),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(24),
+                                          side: const BorderSide(color: Color(0xFF2A2A2A)),
+                                        ),
+                                        title: Text(
+                                          'Supprimer la demande ?',
+                                          style: GoogleFonts.montserrat(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        content: Text(
+                                          'Cette action est irréversible. Voulez-vous continuer ?',
+                                          style: GoogleFonts.plusJakartaSans(color: const Color(0xFFA3A3A3)),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: Text(
+                                              'ANNULER',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                color: const Color(0xFFA3A3A3),
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 1.0,
+                                              ),
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            child: Text(
+                                              'SUPPRIMER',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                color: Colors.redAccent,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 1.0,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
                                   },
+                                  onDismissed: (direction) {
+                                    _deleteRequest(request['id']);
+                                  },
+                                  background: Container(
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: 32),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(32),
+                                      border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                                    ),
+                                    child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 28),
+                                  ),
+                                  child: _buildRequestCard(
+                                    request: request,
+                                    title: '${request['make']} ${request['model']}',
+                                    subtitle: dateStr,
+                                    status: ts.translate(status.replaceAll(' ', '_')),
+                                    id: '#${request['id'].toString().substring(0, 4).toUpperCase()}',
+                                    budget: ts.formatPrice((request['budget_max'] ?? 0).toDouble()),
+                                    agent: agentName,
+                                    paymentStatus: request['payment_status'] ?? 'Confirmé',
+                                    step: status == 'initialisée' || status == 'initialisee' ? ts.translate('attente_assignation_agent') : ts.translate('identification_vehicules'),
+                                    icon: isFinished ? Icons.verified_user_rounded : (isPulse ? Icons.directions_car_rounded : Icons.receipt_long_rounded),
+                                    primaryColor: primaryColor,
+                                    borderColor: borderColor,
+                                    mutedForeground: mutedForeground,
+                                    isPulse: isPulse,
+                                    isFinished: isFinished,
+                                    requestStatus: requestStatus,
+                                    onTap: () {
+                                      if (requestStatus == RequestStatus.initiated) {
+                                        Navigator.pushNamed(context, '/create-request', arguments: request);
+                                      } else {
+                                        Navigator.pushNamed(context, '/request-details', arguments: request);
+                                      }
+                                    },
+                                  ),
                                 );
                               },
                             ),
@@ -176,17 +342,17 @@ class _RequestsPageState extends State<RequestsPage> {
       return _requests;
     }
     return _requests.where((request) {
-      final status = request['status']?.toString().toLowerCase();
+      final requestStatus = RequestStatusExtension.fromString(request['status']?.toString() ?? '');
       final translatedFilter = selectedFilter!.toLowerCase();
       
       if (translatedFilter == ts.translate('initialisee').toLowerCase()) {
-        return status == 'initialisee' || status == 'initialisée';
+        return requestStatus == RequestStatus.initiated;
       }
       if (translatedFilter == ts.translate('en_cours').toLowerCase()) {
-        return status == 'en cours' || status == 'en_cours';
+        return requestStatus == RequestStatus.inProgress;
       }
       if (translatedFilter == ts.translate('terminee').toLowerCase()) {
-        return status == 'terminee' || status == 'terminée';
+        return requestStatus == RequestStatus.complete;
       }
       return false;
     }).toList();
@@ -229,7 +395,7 @@ class _RequestsPageState extends State<RequestsPage> {
                     const SizedBox(width: 8),
                     Text(
                       '$activeCount ${ts.translate('actives').toUpperCase()}',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.plusJakartaSans(
                         color: primaryColor,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -269,7 +435,7 @@ class _RequestsPageState extends State<RequestsPage> {
               ),
               child: Text(
                 filters[index],
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.plusJakartaSans(
                   color: isSelected ? Colors.black : mutedForeground,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -283,15 +449,15 @@ class _RequestsPageState extends State<RequestsPage> {
   }
 
   Widget _buildRequestCard({
+    required Map<String, dynamic> request,
     required String title,
     required String subtitle,
     required String status,
     required String id,
-    String? budget,
-    String? agent,
-    String? paymentStatus,
-    String? result,
-    String? step,
+    required String budget,
+    required String agent,
+    required String paymentStatus,
+    required String step,
     required IconData icon,
     bool isPulse = false,
     bool isFinished = false,
@@ -299,14 +465,33 @@ class _RequestsPageState extends State<RequestsPage> {
     required Color borderColor,
     required Color mutedForeground,
     VoidCallback? onTap,
+    RequestStatus? requestStatus,
   }) {
+    Color getStatusColor() {
+      switch (requestStatus) {
+        case RequestStatus.initiated:
+          return Colors.orangeAccent;
+        case RequestStatus.inProgress:
+          return Colors.blueAccent;
+        case RequestStatus.found:
+        case RequestStatus.complete:
+          return Colors.greenAccent;
+        default:
+          return mutedForeground;
+      }
+    }
+
+    final statusColorFinal = getStatusColor();
+    final statusBgColor = statusColorFinal.withOpacity(0.1);
+    final statusBorderColor = statusColorFinal.withOpacity(0.2);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFF141414).withOpacity(0.4),
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: borderColor.withOpacity(0.6)),
+          border: Border.all(color: isPulse ? primaryColor.withOpacity(0.4) : borderColor.withOpacity(0.6)),
         ),
         child: Column(
           children: [
@@ -328,7 +513,7 @@ class _RequestsPageState extends State<RequestsPage> {
                               border: Border.all(color: isFinished ? Colors.green.withOpacity(0.2) : (isPulse ? primaryColor.withOpacity(0.2) : borderColor.withOpacity(0.5))),
                             ),
                             child: Icon(
-                              icon,
+                              isFinished ? Icons.verified_user_rounded : (isPulse ? Icons.directions_car_rounded : icon),
                               color: isFinished ? Colors.green : (isPulse ? primaryColor : mutedForeground),
                               size: 24,
                             ),
@@ -347,8 +532,8 @@ class _RequestsPageState extends State<RequestsPage> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                subtitle.toUpperCase(),
-                                style: GoogleFonts.dmSans(
+                                subtitle,
+                                style: GoogleFonts.plusJakartaSans(
                                   color: mutedForeground,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
@@ -362,174 +547,246 @@ class _RequestsPageState extends State<RequestsPage> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isFinished ? Colors.green.withOpacity(0.1) : (isPulse ? primaryColor.withOpacity(0.1) : const Color(0xFF1F1F1F).withOpacity(0.5)),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: isFinished ? Colors.green.withOpacity(0.2) : (isPulse ? primaryColor.withOpacity(0.2) : borderColor.withOpacity(0.6))),
-                            ),
-                            child: Text(
-                              status.toUpperCase(),
-                              style: GoogleFonts.dmSans(
-                                color: isFinished ? Colors.greenAccent : (isPulse ? primaryColor : mutedForeground),
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: statusBgColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: statusBorderColor),
+                                ),
+                                child: Text(
+                                  status.toUpperCase(),
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: statusColorFinal,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
                           const SizedBox(height: 4),
                           Text(
                             id,
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.plusJakartaSans(
                               color: mutedForeground,
                               fontSize: 8,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   Container(
-                    height: 1,
-                    color: borderColor.withOpacity(0.2),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isFinished ? ts.translate('statut').toUpperCase() : ts.translate('budget_max').toUpperCase(),
-                              style: GoogleFonts.dmSans(
-                                color: mutedForeground,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.0,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      border: Border.symmetric(horizontal: BorderSide(color: borderColor.withOpacity(0.2))),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                ts.translate('budget_max').toUpperCase(),
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: mutedForeground,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              budget ?? '',
-                              style: GoogleFonts.montserrat(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
+                              const SizedBox(height: 4),
+                              Text(
+                                budget,
+                                style: GoogleFonts.montserrat(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              isFinished ? ts.translate('resultat').toUpperCase() : (paymentStatus != null ? ts.translate('paiement').toUpperCase() : ts.translate('agent').toUpperCase()),
-                              style: GoogleFonts.dmSans(
-                                color: mutedForeground,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.0,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                isFinished ? ts.translate('statut').toUpperCase() : (isPulse ? ts.translate('agent').toUpperCase() : ts.translate('paiement').toUpperCase()),
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: mutedForeground,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
+                              const SizedBox(height: 4),
+                              if (isFinished)
                                 Text(
-                                  result ?? (paymentStatus ?? (agent ?? '')),
+                                  ts.translate('livre'),
                                   style: GoogleFonts.montserrat(
-                                    color: (paymentStatus != null || isFinished) ? (isFinished ? Colors.white : primaryColor) : Colors.white,
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              else if (isPulse)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      agent,
+                                      style: GoogleFonts.montserrat(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.verified_rounded, color: Colors.blue, size: 12),
+                                  ],
+                                )
+                              else
+                                Text(
+                                  ts.translate('confirme'),
+                                  style: GoogleFonts.montserrat(
+                                    color: primaryColor,
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                if (agent != null) ...[
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.verified_rounded, color: Colors.blueAccent, size: 12),
-                                ],
-                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (isFinished)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildSecondaryButton(ts.translate('consulter_rapport'), () {}),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildPrimaryButton(
+                            label: 'LAISSER UN AVIS',
+                            icon: Icons.star_rounded,
+                            onTap: () => Navigator.pushNamed(context, '/leave-review', arguments: request),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: isPulse ? primaryColor : mutedForeground.withOpacity(0.3),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              step,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: mutedForeground,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
+                        GestureDetector(
+                          onTap: onTap,
+                          child: Row(
+                            children: [
+                              Text(
+                                ts.translate('details'),
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_ios_rounded, color: primaryColor, size: 10),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
-            if (isFinished)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: borderColor.withOpacity(0.2))),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      ts.translate('consulter_rapport'),
-                      style: GoogleFonts.dmSans(
-                        color: mutedForeground,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_ios_rounded, color: mutedForeground, size: 14),
-                  ],
-                ),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: isPulse ? primaryColor : mutedForeground.withOpacity(0.3),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          step ?? '',
-                          style: GoogleFonts.dmSans(
-                            color: mutedForeground,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          ts.translate('details'),
-                          style: GoogleFonts.dmSans(
-                            color: primaryColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(Icons.arrow_forward_ios_rounded, color: primaryColor, size: 14),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryButton({required String label, required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFD4AF37),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFD4AF37).withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.black, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.black,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondaryButton(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1F1F1F).withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF2A2A2A)),
+        ),
+        child: Text(
+          label.toUpperCase(),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.plusJakartaSans(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

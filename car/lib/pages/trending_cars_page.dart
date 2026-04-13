@@ -188,7 +188,7 @@ class _TrendingCarsPageState extends State<TrendingCarsPage> {
                                 car: car,
                                 title: '${car['make'] ?? car['name'] ?? ''} ${car['model'] ?? ''}'.trim(),
                                 subtitle: year.isNotEmpty ? '$year Model' : '',
-                                price: ts.formatPrice((car['price'] ?? 0).toDouble()),
+                                price: ts.formatPrice((car['final_price'] ?? 0).toDouble()),
                                 distance: car['mileage'] ?? '',
                                 type: car['fuel_type'] ?? 'Petrol',
                                 badge: car['badge'] ?? '',
@@ -260,7 +260,10 @@ class _TrendingCarCardState extends State<TrendingCarCard> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.pushNamed(context, '/car-details', arguments: widget.car);
+        Navigator.pushNamed(context, '/car-details', arguments: {
+          ...widget.car,
+          'is_match': false,
+        });
       },
       child: Container(
         decoration: BoxDecoration(

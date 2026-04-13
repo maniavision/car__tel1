@@ -14,16 +14,25 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late ScrollController _scrollController;
+  late ScrollController _hotDealsScrollController;
   Timer? _timer;
+  bool _isUserInteractingTrending = false;
+  bool _isUserInteractingHotDeals = false;
+  Timer? _resumeTrendingTimer;
+  Timer? _resumeHotDealsTimer;
   List<Map<String, dynamic>> _trendingCars = [];
+  List<Map<String, dynamic>> _hotDeals = [];
   bool _isLoadingTrending = true;
+  bool _isLoadingHotDeals = true;
   Map<String, dynamic>? _profileData;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _hotDealsScrollController = ScrollController();
     _fetchTrendingCars();
+    _fetchHotDeals();
     _fetchProfile();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startAutoScroll();
@@ -52,6 +61,30 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _fetchHotDeals() async {
+    try {
+      final response = await Supabase.instance.client
+          .schema('cartel')
+          .from('car_deal')
+          .select()
+          .eq('status', 'Available')
+          .order('created_at', ascending: false)
+          .limit(10);
+      
+      if (mounted) {
+        setState(() {
+          _hotDeals = List<Map<String, dynamic>>.from(response);
+          _isLoadingHotDeals = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching hot deals: $e');
+      if (mounted) {
+        setState(() => _isLoadingHotDeals = false);
+      }
+    }
+  }
+
   Future<void> _fetchTrendingCars() async {
     try {
       final response = await Supabase.instance.client
@@ -75,24 +108,34 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _timer?.cancel();
+    _resumeTrendingTimer?.cancel();
+    _resumeHotDealsTimer?.cancel();
     _scrollController.dispose();
+    _hotDealsScrollController.dispose();
     super.dispose();
   }
 
   void _startAutoScroll() {
     _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      if (_scrollController.hasClients) {
-        double maxScroll = _scrollController.position.maxScrollExtent;
-        double currentScroll = _scrollController.position.pixels;
-        double nextScroll = currentScroll - 1.0;
-
-        if (nextScroll <= 0) {
-          _scrollController.jumpTo(maxScroll);
-        } else {
-          _scrollController.jumpTo(nextScroll);
-        }
+      if (_scrollController.hasClients && !_isUserInteractingTrending) {
+        _performAutoScroll(_scrollController);
+      }
+      if (_hotDealsScrollController.hasClients && !_isUserInteractingHotDeals) {
+        _performAutoScroll(_hotDealsScrollController);
       }
     });
+  }
+
+  void _performAutoScroll(ScrollController controller) {
+    double maxScroll = controller.position.maxScrollExtent;
+    double currentScroll = controller.position.pixels;
+    double nextScroll = currentScroll - 1.0;
+
+    if (nextScroll <= 0) {
+      controller.jumpTo(maxScroll);
+    } else {
+      controller.jumpTo(nextScroll);
+    }
   }
 
   @override
@@ -335,22 +378,23 @@ class _HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      ts.translate('trending_now'),
+                      ts.translate('trending_now').toUpperCase(),
                       style: GoogleFonts.montserrat(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 3.0,
                       ),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/trending'),
                       child: Text(
-                        ts.translate('view_all'),
+                        ts.translate('view_all').toUpperCase(),
                         style: GoogleFonts.dmSans(
-                          color: primaryColor,
+                          color: mutedForeground,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 1.0,
+                          letterSpacing: 2.0,
                         ),
                       ),
                     ),
@@ -361,58 +405,167 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
 
               SizedBox(
-                height: 260,
+                height: 280,
                 child: _isLoadingTrending
                     ? const Center(child: CircularProgressIndicator(color: primaryColor))
                     : _trendingCars.isEmpty
                         ? Center(child: Text(ts.translate('no_trending_cars'), style: TextStyle(color: mutedForeground)))
-                        : ListView.separated(
-                            controller: _scrollController,
+                        : NotificationListener<UserScrollNotification>(
+                            onNotification: (notification) {
+                              setState(() => _isUserInteractingTrending = true);
+                              _resumeTrendingTimer?.cancel();
+                              _resumeTrendingTimer = Timer(const Duration(seconds: 3), () {
+                                if (mounted) setState(() => _isUserInteractingTrending = false);
+                              });
+                              return false;
+                            },
+                            child: ListView.separated(
+                                controller: _scrollController,
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
+                                itemCount: _trendingCars.length,
+                                separatorBuilder: (context, index) => const SizedBox(width: 16),
+                                itemBuilder: (context, index) {
+                                  final car = _trendingCars[index];
+                                  
+                                  String imageUrl = '';
+                                  final rawImage = car['image_url'];
+                                  if (rawImage is List && rawImage.isNotEmpty) {
+                                    imageUrl = rawImage[0].toString();
+                                  } else {
+                                    imageUrl = rawImage?.toString() ?? '';
+                                  }
+
+                                  if (imageUrl.isEmpty) {
+                                    imageUrl = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/components/CZTKBqqeLr7.png';
+                                  }
+
+                                  final year = (ts.currentLanguage == 'English' ? (car['year_en'] ?? car['year']?.toString() ?? '') : (car['year_fr'] ?? car['year']?.toString() ?? '')).toString();
+                                  
+                                  return _buildCarCard(
+                                    context,
+                                    car,
+                                    '${car['make'] ?? car['name'] ?? ''} ${car['model'] ?? ''}'.trim(),
+                                    ts.formatPrice((car['final_price'] ?? 0).toDouble()),
+                                    car['mileage'] ?? '',
+                                    year,
+                                    imageUrl,
+                                    primaryColor,
+                                    cardColor,
+                                    borderColor,
+                                  );
+                                },
+                              ),
+                        ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // Hot Deals Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.fireplace_rounded, color: Colors.redAccent, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          ts.translate('hot_deals').toUpperCase(),
+                          style: GoogleFonts.montserrat(
+                            color: primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/deals'),
+                      child: Text(
+                        ts.translate('voir_tout').toUpperCase(),
+                        style: GoogleFonts.dmSans(
+                          color: mutedForeground,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              SizedBox(
+                height: 280,
+                child: _isLoadingHotDeals
+                    ? const Center(child: CircularProgressIndicator(color: primaryColor))
+                    : NotificationListener<UserScrollNotification>(
+                        onNotification: (notification) {
+                          setState(() => _isUserInteractingHotDeals = true);
+                          _resumeHotDealsTimer?.cancel();
+                          _resumeHotDealsTimer = Timer(const Duration(seconds: 3), () {
+                            if (mounted) setState(() => _isUserInteractingHotDeals = false);
+                          });
+                          return false;
+                        },
+                        child: ListView.separated(
+                            controller: _hotDealsScrollController,
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 24),
-                            itemCount: _trendingCars.length,
+                            itemCount: _hotDeals.length,
                             separatorBuilder: (context, index) => const SizedBox(width: 16),
                             itemBuilder: (context, index) {
-                              final car = _trendingCars[index];
+                              final car = _hotDeals[index];
                               
-                              // Handle potential list for image_url
                               String imageUrl = '';
-                              final rawImage = car['image_url'];
-                              if (rawImage is List && rawImage.isNotEmpty) {
-                                imageUrl = rawImage[0].toString();
-                              } else {
-                                imageUrl = rawImage?.toString() ?? '';
+                              final rawImages = car['image_urls'];
+                              if (rawImages is List && rawImages.isNotEmpty) {
+                                imageUrl = rawImages[0].toString();
+                              }
+                              
+                              if (imageUrl.isEmpty) {
+                                imageUrl = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/components/CZTKBqqeLr7.png';
                               }
 
-                              final year = (ts.currentLanguage == 'English' ? (car['year_en'] ?? car['year']?.toString() ?? '') : (car['year_fr'] ?? car['year']?.toString() ?? '')).toString();
-                              
-                              return _buildCarCard(
+                              final double finalPrice = (car['final_price'] ?? 0).toDouble();
+                              final double oldPrice = finalPrice / 0.92;
+
+                              return _buildHotDealCard(
                                 context,
                                 car,
-                                '${car['make'] ?? car['name'] ?? ''} ${car['model'] ?? ''}'.trim(),
-                                ts.formatPrice((car['price'] ?? 0).toDouble()),
-                                car['mileage'] ?? '',
-                                year,
+                                '${car['make']} ${car['model']}',
+                                ts.formatPrice(finalPrice),
+                                ts.formatPrice(oldPrice),
+                                '${car['mileage'] ?? 0} KM',
+                                car['year']?.toString() ?? '',
                                 imageUrl,
                                 primaryColor,
                                 cardColor,
                                 borderColor,
+                                ts,
                               );
                             },
                           ),
+                    ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 40),
 
               // Testimonial Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Text(
-                  ts.translate('experiences_clients'),
+                  ts.translate('experiences_clients').toUpperCase(),
                   style: GoogleFonts.montserrat(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3.0,
                   ),
                 ),
               ),
@@ -422,28 +575,29 @@ class _HomePageState extends State<HomePage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Container(
-                  height: 256,
+                  height: 200,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(32),
-                    color: cardColor,
+                    borderRadius: BorderRadius.circular(40),
+                    border: Border.all(color: borderColor),
                   ),
+                  clipBehavior: Clip.antiAlias,
                   child: Stack(
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(32),
-                        child: Image.network(
-                          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/XSw5ckPj4Vj/components/7tAvnT4URpv.png',
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
+                      Image.network(
+                        'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/XSw5ckPj4Vj/components/7tAvnT4URpv.png',
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: const Color(0xFF1F1F1F),
+                          child: const Center(child: Icon(Icons.image_rounded, color: Colors.white24, size: 40)),
                         ),
                       ),
                       Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(32),
                           gradient: LinearGradient(
-                            colors: [Colors.black.withOpacity(0.9), Colors.transparent],
+                            colors: [Colors.black.withOpacity(0.9), Colors.black.withOpacity(0.4), Colors.transparent],
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
                           ),
@@ -455,29 +609,41 @@ class _HomePageState extends State<HomePage> {
                           mainAxisAlignment: MainAxisAlignment.end,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: List.generate(
-                                  5, (index) => const Icon(Icons.star_rounded, color: primaryColor, size: 16)),
-                            ),
-                            const SizedBox(height: 12),
                             Text(
                               ts.translate('testimonial_text'),
                               style: GoogleFonts.dmSans(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white,
                                 fontSize: 13,
-                                height: 1.5,
-                                fontStyle: FontStyle.italic,
+                                fontWeight: FontWeight.bold,
+                                height: 1.4,
                               ),
                             ),
                             const SizedBox(height: 12),
-                            Text(
-                              '— JEAN-PAUL M., ABIDJAN',
-                              style: GoogleFonts.dmSans(
-                                color: primaryColor,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: primaryColor.withOpacity(0.2)),
+                                    image: const DecorationImage(
+                                      image: NetworkImage('https://randomuser.me/api/portraits/men/44.jpg'),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'ALPHONSE M., DOUALA',
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -487,6 +653,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 120),
+
             ],
           ),
         ),
@@ -518,6 +685,171 @@ class _HomePageState extends State<HomePage> {
 );
 }
 
+  Widget _buildHotDealCard(
+    BuildContext context,
+    Map<String, dynamic> car,
+    String title,
+    String price,
+    String oldPrice,
+    String distance,
+    String year,
+    String imageUrl,
+    Color primaryColor,
+    Color cardColor,
+    Color borderColor,
+    TranslationService ts,
+  ) {
+    final int interestedCount = car['number_people_interested'] ?? 0;
+
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.pushNamed(context, '/car-details', arguments: {
+          ...car,
+          'is_match': false,
+          'is_deal': true,
+        });
+        _fetchHotDeals();
+      },
+      child: Container(
+        width: 280,
+        decoration: BoxDecoration(
+          color: cardColor.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(40),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+                  child: Image.network(
+                    imageUrl,
+                    height: 160,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.people_outline_rounded, color: Colors.white, size: 10),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$interestedCount INTERESTED',
+                          style: GoogleFonts.dmSans(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (year.isNotEmpty)
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: Text(
+                        year.toUpperCase(),
+                        style: GoogleFonts.dmSans(
+                          color: primaryColor,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.montserrat(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            price,
+                            style: GoogleFonts.dmSans(
+                              color: primaryColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (oldPrice.isNotEmpty)
+                            Text(
+                              oldPrice,
+                              style: GoogleFonts.dmSans(
+                                color: const Color(0xFF990000),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: Colors.red,
+                              ),
+                            ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.speed_rounded, color: Color(0xFF888888), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            distance,
+                            style: GoogleFonts.dmSans(
+                              color: const Color(0xFF888888),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCarCard(
     BuildContext context,
     Map<String, dynamic> car,
@@ -532,7 +864,10 @@ class _HomePageState extends State<HomePage> {
   ) {
     return GestureDetector(
       onTap: () {
-        Navigator.pushNamed(context, '/car-details', arguments: car);
+        Navigator.pushNamed(context, '/car-details', arguments: {
+          ...car,
+          'is_match': false,
+        });
       },
       child: Container(
         width: 280,
@@ -633,6 +968,7 @@ class _HomePageState extends State<HomePage> {
                             style: GoogleFonts.dmSans(
                               color: const Color(0xFF888888),
                               fontSize: 11,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],

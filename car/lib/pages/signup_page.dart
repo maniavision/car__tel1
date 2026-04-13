@@ -654,7 +654,7 @@ class _SignUpPageState extends State<SignUpPage> {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int>(
-              value: _selectedCountryId,
+              value: (_countries.any((c) => c['id'] == _selectedCountryId)) ? _selectedCountryId : null,
               isExpanded: true,
               hint: Text(
                 'Sélectionnez votre pays',

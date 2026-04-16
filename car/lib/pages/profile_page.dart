@@ -43,6 +43,10 @@ class _ProfilePageState extends State<ProfilePage> {
           _profileData = response;
           _isLoadingProfile = false;
         });
+        // Sync the translation service state with the profile data
+        if (response['language_preference'] != null) {
+          ts.loadUserPreferences();
+        }
       }
     } catch (e) {
       if (mounted) {

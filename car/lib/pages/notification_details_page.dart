@@ -74,7 +74,7 @@ class NotificationDetailsPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              notification.type.toUpperCase(),
+                              ts.translate(notification.type.toLowerCase()).toUpperCase(),
                               style: GoogleFonts.dmSans(
                                 color: primaryColor,
                                 fontSize: 10,

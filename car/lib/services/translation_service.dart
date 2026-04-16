@@ -348,6 +348,11 @@ class TranslationService extends ChangeNotifier {
       'clear_all_notifications_desc': 'This action cannot be undone.',
       'swipe_to_decide': 'Swipe Right to Accept • Left to Decline',
       'unassigned': 'Unassigned',
+      'match': 'Match',
+      'found': 'Found',
+      'assignment': 'Assignment',
+      'payment': 'Payment',
+      'current_selection': 'Current Selection',
     },
     'Français': {
       'welcome_back': 'BIENVENUE,',
@@ -615,6 +620,11 @@ class TranslationService extends ChangeNotifier {
       'clear_all_notifications_desc': 'Cette action est irréversible.',
       'swipe_to_decide': 'Glissez à Droite pour Accepter • Gauche pour Refuser',
       'unassigned': 'Non assigné',
+      'match': 'Match',
+      'found': 'Trouvé',
+      'assignment': 'Assignation',
+      'payment': 'Paiement',
+      'current_selection': 'Sélection actuelle',
     },
   };
 

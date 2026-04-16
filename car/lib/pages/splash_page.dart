@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:car/services/notification_service.dart';
 import 'package:car/services/translation_service.dart';
+import 'package:car/services/stripe_service.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -173,6 +174,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                         final session = Supabase.instance.client.auth.currentSession;
                         if (session != null) {
                           NotificationService().init();
+                          StripeService().initialize();
                           await TranslationService().loadUserPreferences();
                           if (context.mounted) {
                             Navigator.pushReplacementNamed(context, '/home');

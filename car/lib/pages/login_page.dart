@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:car/services/notification_service.dart';
+import 'package:car/services/stripe_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -29,6 +30,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (response.user != null) {
         NotificationService().init();
+        StripeService().initialize();
         await TranslationService().loadUserPreferences();
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/home');

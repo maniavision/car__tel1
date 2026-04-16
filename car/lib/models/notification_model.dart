@@ -60,4 +60,32 @@ class NotificationModel {
     }
     return description;
   }
+
+  NotificationModel copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? description,
+    String? titleEn,
+    String? titleFr,
+    String? descriptionEn,
+    String? descriptionFr,
+    String? type,
+    DateTime? createdAt,
+    bool? isRead,
+  }) {
+    return NotificationModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      titleEn: titleEn ?? this.titleEn,
+      titleFr: titleFr ?? this.titleFr,
+      descriptionEn: descriptionEn ?? this.descriptionEn,
+      descriptionFr: descriptionFr ?? this.descriptionFr,
+      type: type ?? this.type,
+      createdAt: createdAt ?? this.createdAt,
+      isRead: isRead ?? this.isRead,
+    );
+  }
 }

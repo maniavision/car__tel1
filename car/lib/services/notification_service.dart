@@ -101,17 +101,7 @@ class NotificationService extends ChangeNotifier {
           .eq('user_id', user.id)
           .eq('is_read', false);
 
-      _notifications = _notifications.map((n) {
-        return NotificationModel(
-          id: n.id,
-          userId: n.userId,
-          title: n.title,
-          description: n.description,
-          type: n.type,
-          createdAt: n.createdAt,
-          isRead: true,
-        );
-      }).toList();
+      _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
       
       notifyListeners();
     } catch (e) {
@@ -130,15 +120,7 @@ class NotificationService extends ChangeNotifier {
           .update({'is_read': true})
           .eq('id', notificationId);
 
-      _notifications[index] = NotificationModel(
-        id: _notifications[index].id,
-        userId: _notifications[index].userId,
-        title: _notifications[index].title,
-        description: _notifications[index].description,
-        type: _notifications[index].type,
-        createdAt: _notifications[index].createdAt,
-        isRead: true,
-      );
+      _notifications[index] = _notifications[index].copyWith(isRead: true);
       
       notifyListeners();
     } catch (e) {

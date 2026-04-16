@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
+import 'package:car/services/notification_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -27,6 +28,8 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (response.user != null) {
+        NotificationService().init();
+        await TranslationService().loadUserPreferences();
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/home');
         }
@@ -39,8 +42,9 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       if (mounted) {
+        final ts = TranslationService();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Une erreur est survenue'), backgroundColor: Colors.red),
+          SnackBar(content: Text(ts.translate('error_occurred')), backgroundColor: Colors.red),
         );
       }
     } finally {

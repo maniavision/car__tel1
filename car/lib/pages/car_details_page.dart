@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,6 +12,7 @@ class CarDetailsPage extends StatefulWidget {
 }
 
 class _CarDetailsPageState extends State<CarDetailsPage> {
+  final ts = TranslationService();
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
   bool _isProcessing = false;
@@ -25,7 +27,6 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
     final bool isMatch = args['is_match'] == true;
-    final ts = TranslationService();
 
     List<String> images = [];
     final rawImages = args['image_urls'] ?? args['image_url'];
@@ -51,21 +52,22 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
       builder: (context, _) {
         return Scaffold(
           backgroundColor: backgroundColor,
-          body: Stack(
-            children: [
-              SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 120),
-                    _buildContent(args, ts, primaryColor, borderColor, mutedForeground, isMatch, images),
-                    const SizedBox(height: 140),
-                  ],
+          body: SafeArea(
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      _buildContent(args, primaryColor, borderColor, mutedForeground, isMatch, images),
+                      const SizedBox(height: 140),
+                    ],
+                  ),
                 ),
-              ),
-              _buildHeader(context, borderColor),
-              _buildBottomActions(context, ts, primaryColor, backgroundColor, isMatch, borderColor),
-            ],
+                _buildHeader(context, borderColor),
+                _buildBottomActions(context, primaryColor, backgroundColor, isMatch, borderColor),
+              ],
+            ),
           ),
         );
       },
@@ -78,11 +80,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.4),
-          border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.05))),
-        ),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -112,7 +110,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
     );
   }
 
-  Widget _buildContent(Map<String, dynamic> car, TranslationService ts, Color primaryColor, Color borderColor, Color mutedForeground, bool isMatch, List<String> images) {
+  Widget _buildContent(Map<String, dynamic> car, Color primaryColor, Color borderColor, Color mutedForeground, bool isMatch, List<String> images) {
     final year = car['year']?.toString() ?? '2022';
     final make = car['make'] ?? car['name'] ?? 'Mercedes-Benz';
     final model = car['model'] ?? 'GLE 450';
@@ -121,18 +119,15 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
     final transmission = car['transmission'] ?? '9G-Tronic Auto';
     final exteriorColor = car['exterior_color'] ?? 'Silver Met.';
     final interiorColor = car['interior_color'] ?? 'Espresso Br.';
-    final agentNotes = car['agent_notes'] ?? ts.translate('default_expertise_note');
-    
-    final agentData = car['agents'];
-    final agentName = agentData?['name'] ?? 'Jean-Paul Moukoko';
-    final agentAvatar = agentData?['avatar_url'] ?? 'https://randomuser.me/api/portraits/men/32.jpg';
+
+    final isDeal = car['is_deal'] == true;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildMainImage(images, primaryColor),
+          _buildMainImage(car, images, primaryColor, isDeal),
           const SizedBox(height: 24),
           _buildThumbnails(images, primaryColor),
           const SizedBox(height: 48),
@@ -178,7 +173,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      ts.formatPrice((car['final_price'] ?? 0).toDouble()).replaceAll(' FCFA', 'M FCFA'),
+                      ts.formatPrice((car['final_price'] ?? 0).toDouble()),
                       style: GoogleFonts.montserrat(
                         color: primaryColor,
                         fontSize: 24,
@@ -220,23 +215,18 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
               Expanded(child: _buildColorSpec(ts.translate('cuir_int'), interiorColor, const Color(0xFF3D2B1F))),
             ],
           ),
-          
-          const SizedBox(height: 48),
-          
-          _buildAgentVerdict(agentName, agentAvatar, agentNotes, primaryColor, ts),
         ],
       ),
     );
   }
 
-  Widget _buildMainImage(List<String> images, Color primaryColor) {
+  Widget _buildMainImage(Map<String, dynamic> car, List<String> images, Color primaryColor, bool isDeal) {
     return AspectRatio(
-      aspectRatio: 1.6, // 16/10
+      aspectRatio: 1.6,
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(48),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.8),
@@ -258,12 +248,49 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                   onTap: () => _showFullScreenImage(context, images, index),
                   child: Image.network(
                     images[index],
-                    fit: BoxFit.contain,
+                    fit: BoxFit.cover,
                   ),
                 );
               },
             ),
-            // Navigation Arrows
+            if (isDeal)
+              Positioned(
+                top: 24,
+                left: 24,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: primaryColor.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.people_outline_rounded, color: primaryColor, size: 14),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '${car['number_people_interested'] ?? 0} ${ts.translate('interested')}',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Positioned.fill(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -280,7 +307,6 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                 ),
               ),
             ),
-            // Dots
             Positioned(
               bottom: 24,
               left: 24,
@@ -361,10 +387,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
               clipBehavior: Clip.antiAlias,
               child: Opacity(
                 opacity: isSelected ? 1 : 0.4,
-                child: Container(
-                  color: Colors.black.withOpacity(0.1),
-                  child: Image.network(images[index], fit: BoxFit.cover),
-                ),
+                child: Image.network(images[index], fit: BoxFit.cover),
               ),
             ),
           );
@@ -376,17 +399,24 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
   Widget _buildSpecsHeader(String title, Color primaryColor) {
     return Row(
       children: [
-        Text(
-          title.toUpperCase(),
-          style: GoogleFonts.plusJakartaSans(
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(
             color: primaryColor,
-            fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 4.0,
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(width: 16),
-        Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.05))),
+        const SizedBox(width: 12),
+        Text(
+          title.toUpperCase(),
+          style: GoogleFonts.montserrat(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
+        ),
       ],
     );
   }
@@ -394,52 +424,27 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
   Widget _buildSpecRow(String label, String value, IconData icon, Color primaryColor, {bool isHighlight = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(32),
-        border: isHighlight
-            ? Border.all(color: primaryColor.withOpacity(0.3))
-            : Border.all(color: Colors.white.withOpacity(0.05)),
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isHighlight ? primaryColor.withOpacity(0.3) : Colors.white.withOpacity(0.05)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(16)),
-                  child: Icon(icon, color: isHighlight ? primaryColor : primaryColor.withOpacity(0.7), size: 20),
-                ),
-                const SizedBox(width: 16),
-                Flexible(
-                  child: Text(
-                    label.toUpperCase(),
-                    style: GoogleFonts.plusJakartaSans(
-                      color: const Color(0xFFA3A3A3),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.0,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Icon(icon, color: isHighlight ? primaryColor : Colors.white38, size: 20),
           const SizedBox(width: 16),
-          Flexible(
-            child: Text(
-              value.toUpperCase(),
-              style: GoogleFonts.plusJakartaSans(
-                color: isHighlight ? primaryColor : Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 14),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: isHighlight ? primaryColor : Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -447,48 +452,37 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
     );
   }
 
-  Widget _buildColorSpec(String label, String value, Color colorDot) {
+  Widget _buildColorSpec(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(32),
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label.toUpperCase(),
-            style: GoogleFonts.plusJakartaSans(
-              color: const Color(0xFFA3A3A3),
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2.0,
-            ),
+            label,
+            style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 12),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Row(
             children: [
               Container(
-                width: 24,
-                height: 24,
+                width: 12,
+                height: 12,
                 decoration: BoxDecoration(
-                  color: colorDot,
+                  color: color,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10)],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  value.toUpperCase(),
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  value,
+                  style: GoogleFonts.plusJakartaSans(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -499,311 +493,226 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
     );
   }
 
-  Widget _buildAgentVerdict(String name, String avatar, String notes, Color primaryColor, TranslationService ts) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [primaryColor.withOpacity(0.1), Colors.transparent],
-        ),
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: primaryColor.withOpacity(0.2)),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -16,
-            right: -16,
-            child: Opacity(
-              opacity: 0.05,
-              child: Icon(Icons.format_quote_rounded, size: 80, color: primaryColor),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: primaryColor.withOpacity(0.2), width: 2),
-                      image: DecorationImage(image: NetworkImage(avatar), fit: BoxFit.cover),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'VERDICT EXPERT',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.0,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          'Luxe & Performance',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: primaryColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '"$notes"',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 14,
-                  height: 1.6,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleInterested(Map<String, dynamic> car) async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) {
-      Navigator.pushNamed(context, '/login');
-      return;
-    }
-
-    setState(() => _isProcessing = true);
-
-    try {
-      // 1. Increment number_people_interested in cartel.car_deal
-      await Supabase.instance.client
-          .schema('cartel')
-          .from('car_deal')
-          .update({
-            'number_people_interested': (car['number_people_interested'] ?? 0) + 1,
-          })
-          .eq('id', car['id']);
-
-      // 2. Create a request in cartel.requests
-      final price = (car['final_price'] ?? 0).toDouble();
-      final data = {
-        'user_id': user.id,
-        'car_deal_id': car['id'],
-        'make': car['make'] ?? 'Unknown',
-        'model': car['model'] ?? 'Unknown',
-        'year_min': car['year'],
-        'year_max': car['year'],
-        'budget_min': price,
-        'budget_max': price,
-        'mileage': car['mileage']?.toString() ?? '0',
-        'currency': 'FCFA',
-        'car_condition': 'Used',
-        'exterior_color': car['exterior_color'],
-        'status': 'initialisée',
-        'payment_status': 'pending',
-      };
-
-      await Supabase.instance.client
-          .schema('cartel')
-          .from('requests')
-          .insert(data);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Request created! Redirecting to payment...'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushNamed(context, '/payment');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
-    }
-  }
-
-  Widget _buildBottomActions(BuildContext context, TranslationService ts, Color primaryColor, Color backgroundColor, bool isMatch, Color borderColor) {
+  Widget _buildBottomActions(BuildContext context, Color primaryColor, Color backgroundColor, bool isMatch, Color borderColor) {
     final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-    final bool isDeal = args['is_deal'] == true;
+    final isDeal = args['is_deal'] == true;
 
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 48),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.transparent, backgroundColor.withOpacity(0.95), backgroundColor],
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [backgroundColor, backgroundColor.withOpacity(0)],
           ),
         ),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(40),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 50, offset: const Offset(0, 25))],
-          ),
-          child: isMatch 
-            ? Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: TextButton(
-                      onPressed: () {},
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.green.withOpacity(0.15),
-                        foregroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
-                          side: BorderSide(color: Colors.green.withOpacity(0.3)),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.check_circle_rounded, size: 20),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Text(
-                              ts.translate('accepter').toUpperCase(),
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
+        child: SafeArea(
+          child: isMatch
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isProcessing ? null : () async {
+                          final bool? confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              backgroundColor: const Color(0xFF141414),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                side: const BorderSide(color: Color(0xFF2A2A2A)),
                               ),
-                              overflow: TextOverflow.ellipsis,
+                              title: Text(
+                                ts.translate('accepter_offre'),
+                                style: GoogleFonts.montserrat(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                              content: Text(
+                                ts.translate('confirm_accept_match_desc'),
+                                style: GoogleFonts.plusJakartaSans(color: const Color(0xFFA3A3A3)),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: Text(ts.translate('cancel'), style: const TextStyle(color: Color(0xFFA3A3A3))),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: Text(ts.translate('accepter'), style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                ),
+                              ],
                             ),
+                          );
+
+                          if (confirm != true) return;
+
+                          setState(() => _isProcessing = true);
+                          try {
+                            final supabase = Supabase.instance.client;
+                            final matchId = args['id'];
+                            final requestId = args['request_id'];
+
+                            if (requestId == null) throw 'Request ID missing';
+
+                            // 1. Update the match status to Accepted
+                            await supabase
+                                .schema('cartel')
+                                .from('matches')
+                                .update({'status': 'Accepted'})
+                                .eq('id', matchId);
+
+                            // 2. Update the request status to Complete
+                            await supabase
+                                .schema('cartel')
+                                .from('requests')
+                                .update({
+                                  'status': 'Complete',
+                                })
+                                .eq('id', requestId);
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(ts.translate('match_accepte_success')), backgroundColor: Colors.green),
+                              );
+                              Navigator.pop(context, true); // Pop back to request details
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('${ts.translate('error')}: $e'), backgroundColor: Colors.red),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _isProcessing = false);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.red.withOpacity(0.1),
-                        foregroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
-                          side: BorderSide(color: Colors.red.withOpacity(0.2)),
+                          elevation: 8,
                         ),
-                      ),
-                      child: Text(
-                        ts.translate('refuser').toUpperCase(),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
-                        ),
+                        child: _isProcessing
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : Text(
+                                ts.translate('accepter').toUpperCase(),
+                                style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0),
+                              ),
                       ),
                     ),
-                  ),
-                ],
-              )
-            : isDeal
-              ? SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: _isProcessing ? null : () => _handleInterested(args),
-                    style: TextButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      elevation: 8,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (_isProcessing)
-                          const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                          )
-                        else
-                          const Icon(Icons.favorite_rounded, size: 20),
-                        const SizedBox(width: 12),
-                        Text(
-                          'INTERESTED'.toUpperCase(),
-                          style: GoogleFonts.montserrat(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 )
-              : SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/create-request');
-                    },
-                    style: TextButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      elevation: 8,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.search_rounded, size: 20),
-                        const SizedBox(width: 12),
-                        Text(
-                          ts.translate('start_sourcing').toUpperCase(),
-                          style: GoogleFonts.montserrat(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.0,
+              : isDeal
+                  ? SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isProcessing ? null : () async {
+                          setState(() => _isProcessing = true);
+                          try {
+                            final user = Supabase.instance.client.auth.currentUser;
+                            if (user == null) return;
+
+                            final carDealId = args['car_deal_id'] ?? args['id'];
+                            await Supabase.instance.client.schema('cartel').from('car_deal').update({
+                              'number_people_interested': (args['number_people_interested'] ?? 0) + 1
+                            }).eq('id', carDealId);
+
+                            await Supabase.instance.client.schema('cartel').from('requests').insert({
+                              'user_id': user.id,
+                              'make': args['make'],
+                              'model': args['model'],
+                              'budget_min': args['price'],
+                              'budget_max': args['final_price'],
+                              'car_deal_id': carDealId,
+                              'status': 'Initiated'
+                            });
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Demande envoyée avec succès')),
+                              );
+                              Navigator.pushReplacementNamed(context, '/requests');
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Erreur: $e')),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _isProcessing = false);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
                           ),
+                          elevation: 8,
                         ),
-                      ],
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_isProcessing)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                              )
+                            else
+                              const Icon(Icons.favorite_rounded, size: 20),
+                            const SizedBox(width: 12),
+                            Text(
+                              ts.translate('interested').toUpperCase(),
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/create-request');
+                        },
+                        style: TextButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          elevation: 8,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.search_rounded, size: 20),
+                            const SizedBox(width: 12),
+                            Text(
+                              ts.translate('start_sourcing').toUpperCase(),
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
         ),
       ),
     );

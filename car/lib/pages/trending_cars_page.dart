@@ -187,7 +187,7 @@ class _TrendingCarsPageState extends State<TrendingCarsPage> {
                               return TrendingCarCard(
                                 car: car,
                                 title: '${car['make'] ?? car['name'] ?? ''} ${car['model'] ?? ''}'.trim(),
-                                subtitle: year.isNotEmpty ? '$year Model' : '',
+                                subtitle: year.isNotEmpty ? '$year ${ts.translate('model_suffix')}' : '',
                                 price: ts.formatPrice((car['final_price'] ?? 0).toDouble()),
                                 distance: car['mileage'] ?? '',
                                 type: car['fuel_type'] ?? 'Petrol',

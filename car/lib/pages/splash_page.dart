@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:car/services/notification_service.dart';
+import 'package:car/services/translation_service.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -167,10 +169,14 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         final session = Supabase.instance.client.auth.currentSession;
                         if (session != null) {
-                          Navigator.pushReplacementNamed(context, '/home');
+                          NotificationService().init();
+                          await TranslationService().loadUserPreferences();
+                          if (context.mounted) {
+                            Navigator.pushReplacementNamed(context, '/home');
+                          }
                         } else {
                           Navigator.pushNamed(context, '/language');
                         }

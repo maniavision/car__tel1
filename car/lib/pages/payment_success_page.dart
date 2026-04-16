@@ -280,7 +280,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> with SingleTick
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/notifications');
+                Navigator.pushNamed(context, '/requests');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,

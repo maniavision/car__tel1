@@ -106,7 +106,7 @@ class _RequestsPageState extends State<RequestsPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Erreur: Impossible de supprimer la demande #$requestId. RLS ou ID incorrect.'),
+              content: Text('${ts.translate('request_delete_error')} #$requestId'),
               backgroundColor: Colors.orange,
               duration: const Duration(seconds: 4),
             ),
@@ -122,8 +122,8 @@ class _RequestsPageState extends State<RequestsPage> {
           _requests.removeWhere((r) => r['id'].toString() == requestId.toString());
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Demande supprimée avec succès'),
+          SnackBar(
+            content: Text(ts.translate('request_deleted')),
             backgroundColor: Colors.green,
           ),
         );
@@ -133,7 +133,7 @@ class _RequestsPageState extends State<RequestsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur critique: $e'),
+            content: Text('${ts.translate('error')}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -200,10 +200,12 @@ class _RequestsPageState extends State<RequestsPage> {
                                 final request = _filteredRequests()[index];
                                 final requestStatus = RequestStatusExtension.fromString(request['status']?.toString() ?? '');
                                 final status = request['status']?.toString().toLowerCase() ?? 'initialisée';
-                                final isFinished = status == 'terminee' || status == 'terminée';
-                                final isPulse = status == 'en cours' || status == 'en_cours';
+                                final isFinished = requestStatus == RequestStatus.complete;
+                                final isPulse = requestStatus == RequestStatus.inProgress;
                                 final agentData = request['agents'];
-                                final agentName = agentData?['name'] ?? 'Jean-Paul M.';
+                                final agentName = agentData?['name'] ?? ts.translate('unassigned');
+                                final isUnassigned = request['agent_id'] == null;
+                                final canEditOrDelete = requestStatus == RequestStatus.initiated && isUnassigned;
                                 
                                 String dateStr = '';
                                 try {
@@ -215,7 +217,7 @@ class _RequestsPageState extends State<RequestsPage> {
 
                                 return Dismissible(
                                   key: Key(request['id'].toString()),
-                                  direction: requestStatus == RequestStatus.initiated 
+                                  direction: canEditOrDelete
                                       ? DismissDirection.endToStart 
                                       : DismissDirection.none,
                                   confirmDismiss: (direction) async {
@@ -228,21 +230,21 @@ class _RequestsPageState extends State<RequestsPage> {
                                           side: const BorderSide(color: Color(0xFF2A2A2A)),
                                         ),
                                         title: Text(
-                                          'Supprimer la demande ?',
+                                          ts.translate('delete_request_title'),
                                           style: GoogleFonts.montserrat(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                         content: Text(
-                                          'Cette action est irréversible. Voulez-vous continuer ?',
+                                          ts.translate('delete_request_msg'),
                                           style: GoogleFonts.plusJakartaSans(color: const Color(0xFFA3A3A3)),
                                         ),
                                         actions: [
                                           TextButton(
                                             onPressed: () => Navigator.pop(context, false),
                                             child: Text(
-                                              'ANNULER',
+                                              ts.translate('cancel'),
                                               style: GoogleFonts.plusJakartaSans(
                                                 color: const Color(0xFFA3A3A3),
                                                 fontWeight: FontWeight.bold,
@@ -253,7 +255,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                           TextButton(
                                             onPressed: () => Navigator.pop(context, true),
                                             child: Text(
-                                              'SUPPRIMER',
+                                              ts.translate('delete'),
                                               style: GoogleFonts.plusJakartaSans(
                                                 color: Colors.redAccent,
                                                 fontWeight: FontWeight.bold,
@@ -296,7 +298,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                     isFinished: isFinished,
                                     requestStatus: requestStatus,
                                     onTap: () {
-                                      if (requestStatus == RequestStatus.initiated) {
+                                      if (canEditOrDelete) {
                                         Navigator.pushNamed(context, '/create-request', arguments: request);
                                       } else {
                                         Navigator.pushNamed(context, '/request-details', arguments: request);
@@ -474,8 +476,9 @@ class _RequestsPageState extends State<RequestsPage> {
         case RequestStatus.inProgress:
           return Colors.blueAccent;
         case RequestStatus.found:
-        case RequestStatus.complete:
           return Colors.greenAccent;
+        case RequestStatus.complete:
+          return const Color(0xFF525252); // Dark grey for Complete
         default:
           return mutedForeground;
       }
@@ -489,9 +492,9 @@ class _RequestsPageState extends State<RequestsPage> {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF141414).withOpacity(0.4),
+          color: isFinished ? const Color(0xFF1F1F1F).withOpacity(0.8) : const Color(0xFF141414).withOpacity(0.4),
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: isPulse ? primaryColor.withOpacity(0.4) : borderColor.withOpacity(0.6)),
+          border: Border.all(color: isFinished ? const Color(0xFF525252).withOpacity(0.3) : (isPulse ? primaryColor.withOpacity(0.4) : borderColor.withOpacity(0.6))),
         ),
         child: Column(
           children: [
@@ -502,48 +505,55 @@ class _RequestsPageState extends State<RequestsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: isFinished ? Colors.green.withOpacity(0.1) : (isPulse ? primaryColor.withOpacity(0.1) : const Color(0xFF1F1F1F)),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: isFinished ? Colors.green.withOpacity(0.2) : (isPulse ? primaryColor.withOpacity(0.2) : borderColor.withOpacity(0.5))),
-                            ),
-                            child: Icon(
-                              isFinished ? Icons.verified_user_rounded : (isPulse ? Icons.directions_car_rounded : icon),
-                              color: isFinished ? Colors.green : (isPulse ? primaryColor : mutedForeground),
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                title,
-                                style: GoogleFonts.montserrat(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: isFinished ? Colors.green.withOpacity(0.1) : (isPulse ? primaryColor.withOpacity(0.1) : const Color(0xFF1F1F1F)),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: isFinished ? Colors.green.withOpacity(0.2) : (isPulse ? primaryColor.withOpacity(0.2) : borderColor.withOpacity(0.5))),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: mutedForeground,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.5,
-                                ),
+                              child: Icon(
+                                isFinished ? Icons.verified_user_rounded : (isPulse ? Icons.directions_car_rounded : icon),
+                                color: isFinished ? Colors.green : (isPulse ? primaryColor : mutedForeground),
+                                size: 24,
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: GoogleFonts.montserrat(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    subtitle,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      color: mutedForeground,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.5,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -666,20 +676,10 @@ class _RequestsPageState extends State<RequestsPage> {
                   ),
                   const SizedBox(height: 16),
                   if (isFinished)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSecondaryButton(ts.translate('consulter_rapport'), () {}),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildPrimaryButton(
-                            label: 'LAISSER UN AVIS',
-                            icon: Icons.star_rounded,
-                            onTap: () => Navigator.pushNamed(context, '/leave-review', arguments: request),
-                          ),
-                        ),
-                      ],
+                    _buildPrimaryButton(
+                      label: ts.translate('leave_review').toUpperCase(),
+                      icon: Icons.star_rounded,
+                      onTap: () => Navigator.pushNamed(context, '/leave-review', arguments: request),
                     )
                   else
                     Row(

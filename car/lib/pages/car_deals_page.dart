@@ -95,7 +95,7 @@ class _CarDealsPageState extends State<CarDealsPage> {
           body: _isLoading
               ? const Center(child: CircularProgressIndicator(color: primaryColor))
               : _carDeals.isEmpty
-                  ? Center(child: Text('No deals available', style: const TextStyle(color: mutedForeground)))
+                  ? Center(child: Text(ts.translate('no_deals_available'), style: const TextStyle(color: mutedForeground)))
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
                       itemCount: _carDeals.length,
@@ -122,7 +122,7 @@ class _CarDealsPageState extends State<CarDealsPage> {
                           title: '${car['make']} ${car['model']}',
                           price: ts.formatPrice(finalPrice),
                           oldPrice: ts.formatPrice(oldPrice),
-                          distance: '${car['mileage'] ?? 0} KM',
+                          distance: '${car['mileage'] ?? 0} ${ts.translate('kilometers').toUpperCase()}',
                           year: year,
                           images: images,
                           primaryColor: primaryColor,
@@ -253,7 +253,7 @@ class _CarDealGridCardState extends State<CarDealGridCard> {
                         const Icon(Icons.people_outline_rounded, color: Colors.white, size: 12),
                         const SizedBox(width: 6),
                         Text(
-                          '$interestedCount INTERESTED',
+                          '$interestedCount ${widget.ts.translate('interested')}',
                           style: GoogleFonts.dmSans(
                             color: Colors.white,
                             fontSize: 10,

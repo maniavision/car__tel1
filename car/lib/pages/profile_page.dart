@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:car/widgets/bottom_nav.dart';
 import 'package:car/services/translation_service.dart';
+import 'package:car/services/notification_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -14,6 +15,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final ts = TranslationService();
   bool _isUploading = false;
   Map<String, dynamic>? _profileData;
   bool _isLoadingProfile = true;
@@ -82,7 +84,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 child: const Icon(Icons.camera_alt_rounded, color: Color(0xFFD4AF37)),
               ),
-              title: const Text('Prendre une photo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: Text(ts.translate('take_photo'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             const SizedBox(height: 8),
@@ -95,7 +97,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 child: const Icon(Icons.photo_library_rounded, color: Color(0xFFD4AF37)),
               ),
-              title: const Text('Choisir dans la galerie', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: Text(ts.translate('choose_gallery'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
             const SizedBox(height: 16),
@@ -150,13 +152,13 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) {
         _fetchProfile();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo de profil mise à jour')),
+          SnackBar(content: Text(ts.translate('profile_updated'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('${ts.translate('error')}: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -175,7 +177,6 @@ class _ProfilePageState extends State<ProfilePage> {
     const borderColor = Color(0xFF222222);
     const secondaryColor = Color(0xFF1A1A1A);
 
-    final ts = TranslationService();
     final user = Supabase.instance.client.auth.currentUser;
 
     return ListenableBuilder(
@@ -187,7 +188,7 @@ class _ProfilePageState extends State<ProfilePage> {
           body: SingleChildScrollView(
             child: Column(
               children: [
-                _buildHeader(primaryColor, backgroundColor, secondaryColor, ts, user),
+                _buildHeader(primaryColor, backgroundColor, secondaryColor, user),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Column(
@@ -195,11 +196,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       _buildSectionTitle(ts.translate('preferences'), primaryColor),
                       const SizedBox(height: 16),
-                      _buildPreferencesCard(primaryColor, cardColor, borderColor, mutedForeground, secondaryColor, ts),
+                      _buildPreferencesCard(primaryColor, cardColor, borderColor, mutedForeground, secondaryColor),
                       const SizedBox(height: 32),
                       _buildSectionTitle(ts.translate('support_legal'), primaryColor),
                       const SizedBox(height: 16),
-                      _buildSupportCard(context, cardColor, borderColor, mutedForeground, secondaryColor, ts),
+                      _buildSupportCard(context, cardColor, borderColor, mutedForeground, secondaryColor),
                       const SizedBox(height: 120),
                     ],
                   ),
@@ -234,9 +235,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildHeader(Color primaryColor, Color backgroundColor, Color secondaryColor, TranslationService ts, User? user) {
+  Widget _buildHeader(Color primaryColor, Color backgroundColor, Color secondaryColor, User? user) {
     final avatarUrl = _profileData?['avatar_url'] ?? user?.userMetadata?['avatar_url'];
-    final fullName = _profileData?['full_name'] ?? user?.userMetadata?['full_name'] ?? 'Fortune Niama';
+    final fullName = _profileData?['full_name'] ?? user?.userMetadata?['full_name'] ?? 'Client CarTel';
     final emailOrBadge = user?.email ?? ts.translate('premium_member');
 
     return Container(
@@ -342,7 +343,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildPreferencesCard(
-      Color primaryColor, Color cardColor, Color borderColor, Color mutedForeground, Color secondaryColor, TranslationService ts) {
+      Color primaryColor, Color cardColor, Color borderColor, Color mutedForeground, Color secondaryColor) {
     String countryDisplay = 'N/A';
     if (_profileData != null && _profileData!['country'] != null) {
       countryDisplay = _profileData!['country']['iso_alpha_2'] ?? _profileData!['country']['country_name'] ?? 'N/A';
@@ -404,7 +405,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildSupportCard(BuildContext context, Color cardColor, Color borderColor, Color mutedForeground, Color secondaryColor, TranslationService ts) {
+  Widget _buildSupportCard(BuildContext context, Color cardColor, Color borderColor, Color mutedForeground, Color secondaryColor) {
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
@@ -438,6 +439,7 @@ class _ProfilePageState extends State<ProfilePage> {
             primaryColor: const Color(0xFFD4AF37),
             secondaryColor: Colors.redAccent.withOpacity(0.1),
             onTap: () async {
+              NotificationService().logout();
               await Supabase.instance.client.auth.signOut();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);

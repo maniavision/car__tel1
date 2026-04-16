@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TranslationService extends ChangeNotifier {
   static final TranslationService _instance = TranslationService._internal();
@@ -13,17 +14,61 @@ class TranslationService extends ChangeNotifier {
 
   void setLanguage(String language) {
     _currentLanguage = language;
+    _syncWithDatabase();
     notifyListeners();
   }
 
   void setCurrency(String currency) {
     _currentCurrency = currency;
+    _syncWithDatabase();
     notifyListeners();
+  }
+
+  Future<void> loadUserPreferences() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final response = await Supabase.instance.client
+            .schema('cartel')
+            .from('profiles')
+            .select('language_preference, currency_preference')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (response != null) {
+          if (response['language_preference'] != null) {
+            _currentLanguage = response['language_preference'];
+          }
+          if (response['currency_preference'] != null) {
+            _currentCurrency = response['currency_preference'];
+          }
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading preferences: $e');
+    }
+  }
+
+  Future<void> _syncWithDatabase() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        await Supabase.instance.client
+            .schema('cartel')
+            .from('profiles')
+            .update({
+          'language_preference': _currentLanguage,
+          'currency_preference': _currentCurrency,
+        }).eq('id', user.id);
+      }
+    } catch (e) {
+      debugPrint('Error syncing preferences: $e');
+    }
   }
 
   String formatPrice(double priceInFCFA) {
     if (_currentCurrency == 'USD') {
-      // Simple conversion for prototype: 1 USD = 600 FCFA
       double usdPrice = priceInFCFA / 600;
       if (usdPrice >= 1000000) {
         return '${(usdPrice / 1000000).toStringAsFixed(1)}M USD';
@@ -40,6 +85,47 @@ class TranslationService extends ChangeNotifier {
   static const Map<String, Map<String, String>> _translations = {
     'English': {
       'welcome_back': 'WELCOME BACK,',
+      'signup_title': 'Join the Elite',
+      'signup_subtitle': 'Experience the future of luxury car sourcing',
+      'full_name': 'Full Name',
+      'email': 'Email',
+      'password': 'Password',
+      'forgot_password': 'Forgot Password?',
+      'or_continue_with': 'OR CONTINUE WITH',
+      'google': 'Google',
+      'apple': 'Apple',
+      'phone_number': 'Phone Number',
+      'country_residence': 'Country of Residence',
+      'i_accept_terms': 'I accept the terms and conditions',
+      'log_in_btn': 'Log In',
+      'signup_btn': 'Sign Up',
+      'new_to_cartel': 'New to CarTel?',
+      'already_have_account': 'Already have an account?',
+      'take_photo': 'Take a photo',
+      'choose_gallery': 'Choose from gallery',
+      'select_country_error': 'Please select your country of residence',
+      'enter_phone_error': 'Please enter your phone number',
+      'accept_terms_error': 'Please accept the terms of use',
+      'error_occurred': 'An error occurred',
+      'select_country': 'Select a country',
+      'search_country': 'Search for a country...',
+      'votre_experience': 'Your Experience',
+      'partagez_avis': 'SHARE YOUR REVIEW',
+      'avis_subtitle': 'Your testimony helps the CarTel community and allows us to improve our services.',
+      'vehicule_livre': 'VEHICLE DELIVERED',
+      'notez_experience': 'RATE YOUR EXPERIENCE',
+      'commentaire_label': 'COMMENT',
+      'commentaire_hint': 'Tell us how your search and delivery went...',
+      'photo_vehicule': 'VEHICLE PHOTO',
+      'ajouter_photo': 'Add a photo',
+      'photo_specs': 'JPG, PNG up to 10 MB',
+      'publier_avis': 'PUBLISH MY REVIEW',
+      'leave_review': 'LEAVE A REVIEW',
+      'give_rating_error': 'Please give a rating',
+      'thank_you_review': 'Thank you for your review!',
+      'error_prefix': 'Error',
+      'profile_updated': 'Profile updated successfully',
+      'error': 'Error',
       'nouveau_ici': 'NEW HERE?',
       'comment_ca_marche': 'How it works?',
       'trending_now': 'Trending Now',
@@ -108,7 +194,14 @@ class TranslationService extends ChangeNotifier {
       'hors_budget': 'OVER BUDGET',
       'chat_agent': 'Chatting with agent...',
       'match_accepte': 'Offer accepted',
-      'match_refuse': 'Offer refused',
+      'match_refuse': 'Offer declined',
+      'accepter_offre': 'Accept this offer?',
+      'confirm_accept_match_desc': 'Do you want to accept this offer? This action is irreversible.',
+      'refuser_offre': 'Decline this offer?',
+      'confirm_decline_match_desc': 'Do you want to decline this offer?',
+      'match_accepte_success': 'Offer accepted successfully',
+      'match_refuse_success': 'Offer declined successfully',
+      'traitement': 'Processing...',
       'notif_match_title': 'New Vehicle Match',
       'notif_match_desc': 'Agent Marcus found a 2023 Porsche Cayenne Coupe S matching your criteria.',
       'notif_assign_title': 'Agent Assigned',
@@ -179,26 +272,13 @@ class TranslationService extends ChangeNotifier {
       'sedan': 'Sedan',
       'mileage_range': 'Mileage Range',
       'kilometers': 'km',
-      'signup_title': 'Join CarTel',
-      'signup_subtitle': 'The luxury of finding your car in one click',
-      'full_name': 'Full Name',
-      'email': 'Email',
-      'phone': 'Phone',
-      'password': 'Password',
       'accept_terms_prefix': 'I accept the',
       'terms_link': 'Terms of Use',
       'and_label': 'and the',
       'privacy_link': 'Privacy Policy',
       'create_account_btn': 'Create my account',
-      'already_have_account': 'Already have an account?',
-      'log_in_btn': 'Log In',
       'login_title': 'Welcome Back',
       'login_subtitle': 'Log in to continue your search',
-      'forgot_password': 'Forgot Password?',
-      'or_continue_with': 'Or continue with',
-      'google': 'Google',
-      'apple': 'Apple',
-      'new_to_cartel': 'New to CarTel?',
       'no_requests_found': 'No requests found',
       'no_trending_cars': 'No trending cars available',
       'expertise_agent': 'Expertise of the Agent',
@@ -214,19 +294,108 @@ class TranslationService extends ChangeNotifier {
       'boite': 'Transmission',
       'peinture_ext': 'Exterior',
       'cuir_int': 'Interior',
-      'accepter_offre': 'Accept this offer',
-      'refuser': 'Decline',
       'prix_exportation': 'Export Price',
       'hot_deals': 'Hot Deals',
       'affordable': 'Affordable',
       'best_price': 'Best Price',
+      'interested': 'INTERESTED',
+      'delete_request_title': 'Delete Request?',
+      'delete_request_msg': 'This action is irreversible. Do you want to continue?',
+      'cancel': 'CANCEL',
+      'delete': 'DELETE',
+      'request_deleted': 'Request deleted successfully',
+      'request_delete_error': 'Error: Could not delete request. RLS or incorrect ID.',
+      'step': 'STEP',
+      'of': 'OF',
+      'confirmation': 'CONFIRMATION',
+      'search_summary': 'SEARCH SUMMARY',
+      'search_request': 'SEARCH REQUEST',
+      'currency_label': 'CURRENCY',
+      'payment_method': 'PAYMENT METHOD',
+      'secure_transaction_msg': 'Secure and encrypted end-to-end transactions.',
+      'pay_amount': 'PAY',
+      'payment_failed_prefix': 'Payment failed',
+      'payment_cancelled_prefix': 'Payment cancelled or failed',
+      'unexpected_error': 'An unexpected error occurred',
+      'onboarding': 'ONBOARDING',
+      'identity': 'IDENTITY',
+      'condition_label': 'CONDITION',
+      'investment': 'INVESTMENT',
+      'specs': 'SPECS',
+      'custom': 'Custom',
+      'e_g_urus': 'e.g. Urus',
+      'no_deals_available': 'No deals available',
+      'model_suffix': 'Model',
+      'searching': 'SEARCHING',
+      'cancel_request': 'CANCEL REQUEST',
+      'cartel_search': 'CARTEL SEARCH',
+      'file_status': 'FILE STATUS',
+      'no_matches_found': 'No matches found',
+      'paiement_valide': 'Payment Validated',
+      'agent_assigne': 'Agent Assigned',
+      'attente_assignation': 'Waiting for assignment...',
+      'recherche_active': 'Active Search',
+      'identification_en_cours': 'Vehicle identification in progress...',
+      'en_attente': 'Waiting...',
+      'rapport_final': 'Final Report',
+      'attente_resultats': 'Waiting for results',
+      'expert_luxe_actif': 'Luxury Expert • Active',
+      'note_logistique': 'Logistics Note',
+      'shipping_fee_prefix': 'International shipping fees from',
+      'no_notifications': 'No notifications available',
+      'clear_all': 'Clear All',
+      'clear_all_notifications_title': 'Clear all notifications?',
+      'clear_all_notifications_desc': 'This action cannot be undone.',
+      'swipe_to_decide': 'Swipe Right to Accept • Left to Decline',
+      'unassigned': 'Unassigned',
     },
     'Français': {
       'welcome_back': 'BIENVENUE,',
+      'signup_title': 'Rejoignez l\'Élite',
+      'signup_subtitle': 'Vivez le futur du sourcing de voitures de luxe',
+      'full_name': 'Nom Complet',
+      'email': 'E-mail',
+      'password': 'Mot de Passe',
+      'forgot_password': 'Mot de passe oublié ?',
+      'or_continue_with': 'OU CONTINUER AVEC',
+      'google': 'Google',
+      'apple': 'Apple',
+      'phone_number': 'Numéro de Téléphone',
+      'country_residence': 'Pays de Résidence',
+      'i_accept_terms': 'J\'accepte les conditions d\'utilisation',
+      'log_in_btn': 'Se Connecter',
+      'signup_btn': 'S\'Inscrire',
+      'new_to_cartel': 'Nouveau sur CarTel ?',
+      'already_have_account': 'Vous avez déjà un compte ?',
+      'take_photo': 'Prendre une photo',
+      'choose_gallery': 'Choisir dans la galerie',
+      'select_country_error': 'Veuillez sélectionner votre pays de résidence',
+      'enter_phone_error': 'Veuillez entrer votre numéro de téléphone',
+      'accept_terms_error': 'Veuillez accepter les conditions d\'utilisation',
+      'error_occurred': 'Une erreur est survenue',
+      'select_country': 'Sélectionnez un pays',
+      'search_country': 'Rechercher un pays...',
+      'votre_experience': 'Votre Expérience',
+      'partagez_avis': 'PARTAGEZ VOTRE AVIS',
+      'avis_subtitle': 'Votre témoignage aide la communauté CarTel et nous permet d\'améliorer nos services.',
+      'vehicule_livre': 'VÉHICULE LIVRÉ',
+      'notez_experience': 'NOTEZ VOTRE EXPÉRIENCE',
+      'commentaire_label': 'COMMENTAIRE',
+      'commentaire_hint': 'Racontez-nous comment s\'est déroulée votre recherche et la livraison...',
+      'photo_vehicule': 'PHOTO DU VÉHICULE',
+      'ajouter_photo': 'Ajouter une photo',
+      'photo_specs': 'JPG, PNG jusqu\'à 10 Mo',
+      'publier_avis': 'PUBLIER MON AVIS',
+      'leave_review': 'LAISSER UN AVIS',
+      'give_rating_error': 'Veuillez donner une note',
+      'thank_you_review': 'Merci pour votre avis !',
+      'error_prefix': 'Erreur',
+      'profile_updated': 'Profil mis à jour avec succès',
+      'error': 'Erreur',
       'nouveau_ici': 'NOUVEAU ICI ?',
       'comment_ca_marche': 'Comment ça marche ?',
       'trending_now': 'Tendances Actuelles',
-      'view_all': 'VOIR TOUT',
+      'view_all': 'Voir tout',
       'experiences_clients': 'Expériences Clients',
       'home': 'Accueil',
       'demandes': 'Demandes',
@@ -292,6 +461,14 @@ class TranslationService extends ChangeNotifier {
       'chat_agent': 'Discussion avec l\'agent...',
       'match_accepte': 'Offre acceptée',
       'match_refuse': 'Offre refusée',
+      'accepter_offre': 'Accepter cette offre ?',
+      'confirm_accept_match_desc': 'Voulez-vous accepter cette offre ? Cette action est irréversible.',
+      'refuser_offre': 'Refuser cette offre ?',
+      'confirm_decline_match_desc': 'Voulez-vous refuser cette offre ?',
+      'match_accepte_success': 'Offre acceptée avec succès',
+      'match_refuse_success': 'Offre refusée avec succès',
+      'traitement': 'Traitement...',
+      'refuser': 'Refuser',
       'notif_match_title': 'Nouveau Match Véhicule',
       'notif_match_desc': 'L\'agent Marcus a trouvé un Porsche Cayenne Coupe S 2023 correspondant à vos critères.',
       'notif_assign_title': 'Agent Assigné',
@@ -317,6 +494,7 @@ class TranslationService extends ChangeNotifier {
       'pricing_from': 'À PARTIR DE',
       'model_label': 'MODÈLE',
       'start_sourcing': 'DÉMARRER LE SOURCING',
+      'kilométrage': 'KILOMÉTRAGE',
       'énergie': 'ÉNERGIE',
       'fuel_petrol': 'Essence',
       'fuel_diesel': 'Diesel',
@@ -361,27 +539,13 @@ class TranslationService extends ChangeNotifier {
       'sedan': 'Berline',
       'mileage_range': 'Gamme de Kilométrage',
       'kilometers': 'km',
-      'signup_title': 'Rejoignez CarTel',
-      'signup_subtitle': 'Le luxe de trouver votre voiture en un clic',
-      'full_name': 'Nom complet',
-      'email': 'E-mail',
-      'phone': 'Téléphone',
-      'password': 'Mot de passe',
       'accept_terms_prefix': 'J\'accepte les',
       'terms_link': 'Conditions d\'Utilisation',
       'and_label': 'et la',
       'privacy_link': 'Politique de Confidentialité',
       'create_account_btn': 'Créer mon compte',
-      'already_have_account': 'Déjà un compte ?',
-      'log_in_btn': 'Se connecter',
       'login_title': 'Bon retour',
       'login_subtitle': 'Connectez-vous pour continuer votre recherche',
-      'forgot_password': 'Mot de passe oublié ?',
-      'or_continue_with': 'Ou continuer avec',
-      'google': 'Google',
-      'apple': 'Apple',
-      'new_to_cartel': 'Nouveau sur CarTel ?',
-      'signup_btn': 'Créer un compte',
       'no_requests_found': 'Aucune demande trouvée',
       'no_trending_cars': 'Aucune voiture tendance disponible',
       'expertise_agent': 'Expertise de l\'Agent',
@@ -397,12 +561,60 @@ class TranslationService extends ChangeNotifier {
       'boite': 'Boîte',
       'peinture_ext': 'Extérieur',
       'cuir_int': 'Intérieur',
-      'accepter_offre': 'Accepter cette offre',
-      'refuser': 'Refuser',
       'prix_exportation': 'Prix Exportation',
       'hot_deals': 'Offres Exceptionnelles',
       'affordable': 'Abordable',
       'best_price': 'Meilleur Prix',
+      'interested': 'INTÉRESSÉ(S)',
+      'delete_request_title': 'Supprimer la demande ?',
+      'delete_request_msg': 'Cette action est irréversible. Voulez-vous continuer ?',
+      'cancel': 'ANNULER',
+      'delete': 'SUPPRIMER',
+      'request_deleted': 'Demande supprimée avec succès',
+      'request_delete_error': 'Erreur: Impossible de supprimer la demande. RLS ou ID incorrect.',
+      'step': 'ÉTAPE',
+      'of': 'SUR',
+      'confirmation': 'CONFIRMATION',
+      'search_summary': 'RÉSUMÉ DE LA RECHERCHE',
+      'search_request': 'DEMANDE DE RECHERCHE',
+      'currency_label': 'DEVISE',
+      'payment_method': 'MÉTHODE DE PAIEMENT',
+      'secure_transaction_msg': 'Transactions sécurisées et chiffrées de bout en bout.',
+      'pay_amount': 'PAYER',
+      'payment_failed_prefix': 'Paiement échoué',
+      'payment_cancelled_prefix': 'Paiement annulé ou échoué',
+      'unexpected_error': 'Une erreur est survenue',
+      'onboarding': 'INTÉGRATION',
+      'identity': 'IDENTITÉ',
+      'condition_label': 'ÉTAT',
+      'investment': 'INVESTISSEMENT',
+      'specs': 'SPÉCIFICATIONS',
+      'custom': 'Personnalisé',
+      'e_g_urus': 'ex. Urus',
+      'no_deals_available': 'Aucune offre disponible',
+      'model_suffix': 'Modèle',
+      'searching': 'EN RECHERCHE',
+      'cancel_request': 'ANNULER LA DEMANDE',
+      'cartel_search': 'RECHERCHE CARTEL',
+      'file_status': 'DU DOSSIER',
+      'no_matches_found': 'Aucun match trouvé',
+      'paiement_valide': 'Paiement Validé',
+      'agent_assigne': 'Agent Assigné',
+      'attente_assignation': 'En attente d\'assignation...',
+      'recherche_active': 'Recherche Active',
+      'identification_en_cours': 'Identification des véhicules en cours...',
+      'en_attente': 'En attente...',
+      'rapport_final': 'Rapport Final',
+      'attente_resultats': 'En attente de résultats',
+      'expert_luxe_actif': 'Expert Luxe • Actif',
+      'note_logistique': 'Note Logistique',
+      'shipping_fee_prefix': "Frais d'expédition internationale à partir de",
+      'no_notifications': 'Aucune notification disponible',
+      'clear_all': 'Tout effacer',
+      'clear_all_notifications_title': 'Effacer toutes les notifications ?',
+      'clear_all_notifications_desc': 'Cette action est irréversible.',
+      'swipe_to_decide': 'Glissez à Droite pour Accepter • Gauche pour Refuser',
+      'unassigned': 'Non assigné',
     },
   };
 

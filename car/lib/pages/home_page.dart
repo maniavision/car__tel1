@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:car/widgets/bottom_nav.dart';
 import 'package:car/services/translation_service.dart';
+import 'package:car/services/notification_service.dart';
 import 'dart:async';
 
 class HomePage extends StatefulWidget {
@@ -22,8 +23,10 @@ class _HomePageState extends State<HomePage> {
   Timer? _resumeHotDealsTimer;
   List<Map<String, dynamic>> _trendingCars = [];
   List<Map<String, dynamic>> _hotDeals = [];
+  List<Map<String, dynamic>> _testimonials = [];
   bool _isLoadingTrending = true;
   bool _isLoadingHotDeals = true;
+  bool _isLoadingTestimonials = true;
   Map<String, dynamic>? _profileData;
 
   @override
@@ -33,10 +36,76 @@ class _HomePageState extends State<HomePage> {
     _hotDealsScrollController = ScrollController();
     _fetchTrendingCars();
     _fetchHotDeals();
+    _fetchTestimonials();
     _fetchProfile();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startAutoScroll();
     });
+  }
+
+  Future<void> _fetchTestimonials() async {
+    try {
+      // 1. Fetch testimonials
+      final testimonialsResponse = await Supabase.instance.client
+          .schema('cartel')
+          .from('testimonials')
+          .select('*')
+          .order('created_at', ascending: false)
+          .limit(8);
+      
+      final List<Map<String, dynamic>> rawTestimonials = List<Map<String, dynamic>>.from(testimonialsResponse);
+      
+      if (rawTestimonials.isEmpty) {
+        if (mounted) setState(() => _isLoadingTestimonials = false);
+        return;
+      }
+
+      // 2. Extract unique locations (IDs)
+      final List<String> locationIds = rawTestimonials
+          .map((t) => t['location']?.toString())
+          .where((loc) => loc != null && loc.isNotEmpty)
+          .cast<String>()
+          .toSet()
+          .toList();
+
+      Map<String, String> countryMap = {};
+      
+      if (locationIds.isNotEmpty) {
+        // 3. Fetch country names
+        final countriesResponse = await Supabase.instance.client
+            .schema('cartel')
+            .from('country_calling_codes')
+            .select('id, country_name')
+            .inFilter('id', locationIds);
+        
+        for (var country in countriesResponse) {
+          countryMap[country['id'].toString()] = country['country_name'].toString();
+        }
+      }
+
+      // 4. Merge data
+      final List<Map<String, dynamic>> mergedTestimonials = rawTestimonials.map((t) {
+        final locId = t['location']?.toString();
+        return {
+          ...t,
+          'display_location': (locId != null && countryMap.containsKey(locId)) 
+              ? countryMap[locId] 
+              : (locId ?? 'Unknown'),
+        };
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _testimonials = mergedTestimonials;
+          _isLoadingTestimonials = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching testimonials: $e');
+      if (mounted) {
+        setState(() => _isLoadingTestimonials = false);
+      }
+    }
   }
 
   Future<void> _fetchProfile() async {
@@ -68,8 +137,8 @@ class _HomePageState extends State<HomePage> {
           .from('car_deal')
           .select()
           .eq('status', 'Available')
-          .order('created_at', ascending: false)
-          .limit(10);
+          .order('created_at', ascending: true)
+          .limit(15);
       
       if (mounted) {
         setState(() {
@@ -90,7 +159,8 @@ class _HomePageState extends State<HomePage> {
       final response = await Supabase.instance.client
           .schema('cartel')
           .from('trending_cars')
-          .select();
+          .select()
+          .order('created_at', ascending: true);
       
       if (mounted) {
         setState(() {
@@ -193,32 +263,51 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             GestureDetector(
                               onTap: () => Navigator.pushNamed(context, '/notifications'),
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: secondaryColor,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: borderColor),
-                                    ),
-                                    child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 20),
-                                  ),
-                                  Positioned(
-                                    top: 10,
-                                    right: 10,
-                                    child: Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: primaryColor,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: backgroundColor, width: 2),
+                              child: ListenableBuilder(
+                                listenable: NotificationService(),
+                                builder: (context, _) {
+                                  final unreadCount = NotificationService().unreadCount;
+                                  return Stack(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: secondaryColor,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: borderColor),
+                                        ),
+                                        child: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 20),
                                       ),
-                                    ),
-                                  ),
-                                ],
+                                      if (unreadCount > 0)
+                                        Positioned(
+                                          top: 0,
+                                          right: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: primaryColor,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(color: backgroundColor, width: 2),
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 16,
+                                              minHeight: 16,
+                                            ),
+                                            child: Text(
+                                              unreadCount > 9 ? '9+' : unreadCount.toString(),
+                                              style: const TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -311,6 +400,66 @@ class _HomePageState extends State<HomePage> {
                   ),
 
                   const SizedBox(height: 16),
+
+                  // Note Logistique
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: primaryColor.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: primaryColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.local_shipping_rounded, color: primaryColor, size: 20),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  ts.translate('note_logistique').toUpperCase(),
+                                  style: GoogleFonts.dmSans(
+                                    color: primaryColor,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                RichText(
+                                  text: TextSpan(
+                                    style: GoogleFonts.dmSans(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    children: [
+                                      TextSpan(text: '${ts.translate('shipping_fee_prefix')} '),
+                                      TextSpan(
+                                        text: ts.formatPrice(2700000),
+                                        style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                   // Nouveau ici ?
                   Padding(
@@ -485,7 +634,7 @@ class _HomePageState extends State<HomePage> {
                     GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/deals'),
                       child: Text(
-                        ts.translate('voir_tout').toUpperCase(),
+                        ts.translate('view_all').toUpperCase(),
                         style: GoogleFonts.dmSans(
                           color: mutedForeground,
                           fontSize: 10,
@@ -541,7 +690,7 @@ class _HomePageState extends State<HomePage> {
                                 '${car['make']} ${car['model']}',
                                 ts.formatPrice(finalPrice),
                                 ts.formatPrice(oldPrice),
-                                '${car['mileage'] ?? 0} KM',
+                                '${car['mileage'] ?? 0} ${ts.translate('kilometers').toUpperCase()}',
                                 car['year']?.toString() ?? '',
                                 imageUrl,
                                 primaryColor,
@@ -557,101 +706,127 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 40),
 
               // Testimonial Section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Text(
-                  ts.translate('experiences_clients').toUpperCase(),
-                  style: GoogleFonts.montserrat(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3.0,
+              if (_testimonials.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Text(
+                    ts.translate('experiences_clients').toUpperCase(),
+                    style: GoogleFonts.montserrat(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3.0,
+                    ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 16),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Container(
+                const SizedBox(height: 16),
+                SizedBox(
                   height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(40),
-                    border: Border.all(color: borderColor),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Stack(
-                    children: [
-                      Image.network(
-                        'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/XSw5ckPj4Vj/components/7tAvnT4URpv.png',
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: const Color(0xFF1F1F1F),
-                          child: const Center(child: Icon(Icons.image_rounded, color: Colors.white24, size: 40)),
-                        ),
-                      ),
-                      Container(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _testimonials.length,
+                    separatorBuilder: (context, index) => const SizedBox(width: 16),
+                    itemBuilder: (context, index) {
+                      final t = _testimonials[index];
+                      return Container(
+                        width: MediaQuery.of(context).size.width - 48,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Colors.black.withOpacity(0.9), Colors.black.withOpacity(0.4), Colors.transparent],
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                          ),
+                          borderRadius: BorderRadius.circular(40),
+                          border: Border.all(color: borderColor),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
                           children: [
-                            Text(
-                              ts.translate('testimonial_text'),
-                              style: GoogleFonts.dmSans(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                height: 1.4,
+                            if (t['image_url'] != null)
+                              Image.network(
+                                t['image_url'],
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  color: const Color(0xFF1F1F1F),
+                                  child: const Center(child: Icon(Icons.image_rounded, color: Colors.white24, size: 40)),
+                                ),
+                              )
+                            else
+                              Container(
+                                color: const Color(0xFF1F1F1F),
+                                width: double.infinity,
+                                height: double.infinity,
+                              ),
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.black.withOpacity(0.9), Colors.black.withOpacity(0.4), Colors.transparent],
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: primaryColor.withOpacity(0.2)),
-                                    image: const DecorationImage(
-                                      image: NetworkImage('https://randomuser.me/api/portraits/men/44.jpg'),
-                                      fit: BoxFit.cover,
+                            Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '"${t['content']}"',
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.dmSans(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.4,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'ALPHONSE M., DOUALA',
-                                  style: GoogleFonts.dmSans(
-                                    color: Colors.white.withOpacity(0.7),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1.5,
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: List.generate(5, (index) {
+                                      final starCount = t['stars'] ?? 5;
+                                      return Icon(
+                                        index < starCount ? Icons.star_rounded : Icons.star_outline_rounded,
+                                        color: index < starCount ? primaryColor : Colors.white24,
+                                        size: 14,
+                                      );
+                                    }),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: const Color(0xFF1F1F1F),
+                                          border: Border.all(color: primaryColor.withOpacity(0.2)),
+                                        ),
+                                        child: const Icon(Icons.person_rounded, color: Colors.white, size: 14),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '${t['client_name'].toString().toUpperCase()}, ${t['display_location'].toString().toUpperCase()}',
+                                        style: GoogleFonts.dmSans(
+                                          color: Colors.white.withOpacity(0.7),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 1.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
-              ),
+              ],
               const SizedBox(height: 120),
 
             ],
@@ -746,7 +921,7 @@ class _HomePageState extends State<HomePage> {
                         const Icon(Icons.people_outline_rounded, color: Colors.white, size: 10),
                         const SizedBox(width: 4),
                         Text(
-                          '$interestedCount INTERESTED',
+                          '$interestedCount ${ts.translate('interested')}',
                           style: GoogleFonts.dmSans(
                             color: Colors.white,
                             fontSize: 8,

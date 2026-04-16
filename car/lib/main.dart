@@ -22,6 +22,7 @@ import 'package:car/pages/leave_review_page.dart';
 import 'package:car/services/translation_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,19 @@ Future<void> main() async {
     url: 'https://avcdscctujjkjmjjfvbm.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2Y2RzY2N0dWpqa2ptampmdmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMjE1NzksImV4cCI6MjA5MDc5NzU3OX0.jpDryLmlUYMCIddv3kuFsJm1fSk4fa6G7iYosxwK2Nk',
   );
+
+  // Initialize Stripe using Edge Function
+  try {
+    final res = await Supabase.instance.client.functions.invoke('stripe-payment', body: {'action': 'get-keys'});
+    final data = res.data;
+    if (data != null && data['publishableKey'] != null) {
+      Stripe.publishableKey = data['publishableKey'];
+      await Stripe.instance.applySettings();
+    }
+  } catch (e) {
+    debugPrint('Error initializing Stripe keys: $e');
+    // Fallback or handle error
+  }
   
   runApp(const MyApp());
 }

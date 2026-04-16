@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:car/services/translation_service.dart';
-
+import 'package:car/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignUpPage extends StatefulWidget {
@@ -14,6 +14,7 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
+  final ts = TranslationService();
   bool _acceptTerms = false;
   bool _isLoading = false;
   XFile? _avatarFile;
@@ -50,6 +51,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
     
+
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -80,7 +82,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 child: const Icon(Icons.camera_alt_rounded, color: Color(0xFFD4AF37)),
               ),
-              title: const Text('Prendre une photo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: Text(ts.translate('take_photo'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             const SizedBox(height: 8),
@@ -93,7 +95,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 child: const Icon(Icons.photo_library_rounded, color: Color(0xFFD4AF37)),
               ),
-              title: const Text('Choisir dans la galerie', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              title: Text(ts.translate('choose_gallery'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
             const SizedBox(height: 16),
@@ -150,23 +152,24 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Future<void> _handleSignUp() async {
+
     if (_selectedCountryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez sélectionner votre pays de résidence')),
+        SnackBar(content: Text(ts.translate('select_country_error'))),
       );
       return;
     }
 
     if (_phoneController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez entrer votre numéro de téléphone')),
+        SnackBar(content: Text(ts.translate('enter_phone_error'))),
       );
       return;
     }
 
     if (!_acceptTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez accepter les conditions d\'utilisation')),
+        SnackBar(content: Text(ts.translate('accept_terms_error'))),
       );
       return;
     }
@@ -188,7 +191,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
       if (response.user != null) {
         try {
-          // Use upsert to handle cases where a database trigger might have already created the profile
           await Supabase.instance.client.schema('cartel').from('profiles').upsert({
             'id': response.user!.id,
             'full_name': _fullNameController.text.trim(),
@@ -199,7 +201,6 @@ class _SignUpPageState extends State<SignUpPage> {
           });
         } catch (dbError) {
           debugPrint('Profile creation error: $dbError');
-          // We still continue as the auth user was created
         }
 
         final avatarUrl = await _uploadAvatar(response.user!.id);
@@ -214,6 +215,8 @@ class _SignUpPageState extends State<SignUpPage> {
         }
 
         if (mounted) {
+          NotificationService().init();
+          await TranslationService().loadUserPreferences();
           Navigator.pushReplacementNamed(context, '/home');
         }
       }
@@ -226,7 +229,7 @@ class _SignUpPageState extends State<SignUpPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Une erreur est survenue'), backgroundColor: Colors.red),
+          SnackBar(content: Text(ts.translate('error_occurred')), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -253,8 +256,6 @@ class _SignUpPageState extends State<SignUpPage> {
     const borderColor = Color(0xFF2A2A2A);
     const mutedForeground = Color(0xFFA3A3A3);
 
-    final ts = TranslationService();
-
     return ListenableBuilder(
       listenable: ts,
       builder: (context, _) {
@@ -262,7 +263,6 @@ class _SignUpPageState extends State<SignUpPage> {
           backgroundColor: backgroundColor,
           body: Stack(
             children: [
-              // Background Blurs
               Positioned(
                 top: -100,
                 left: -100,
@@ -272,13 +272,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   decoration: BoxDecoration(
                     color: primaryColor.withOpacity(0.05),
                     shape: BoxShape.circle,
-                  ),
-                  child: BackdropFilter(
-                    filter: ColorFilter.mode(
-                      primaryColor.withOpacity(0.05),
-                      BlendMode.srcATop,
-                    ),
-                    child: Container(),
                   ),
                 ),
               ),
@@ -300,7 +293,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
                   child: Column(
                     children: [
-                      // Logo
                       Center(
                         child: Image.network(
                           'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/ai/Transparent-File-01-ARxLMHKJIUT.png',
@@ -311,7 +303,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                       const SizedBox(height: 40),
                       
-                      // Title
                       Text(
                         ts.translate('signup_title'),
                         style: GoogleFonts.montserrat(
@@ -333,7 +324,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                       const SizedBox(height: 40),
                       
-                      // Avatar Picker
                       GestureDetector(
                         onTap: _pickImage,
                         child: Stack(
@@ -377,7 +367,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                       const SizedBox(height: 40),
                       
-                      // Form
                       _buildInputField(
                         label: ts.translate('full_name'),
                         placeholder: 'Fortune Niama',
@@ -400,26 +389,6 @@ class _SignUpPageState extends State<SignUpPage> {
                         cardColor: cardColor,
                       ),
                       const SizedBox(height: 20),
-                      _buildCountryDropdown(
-                        label: ts.translate('country_of_residence'),
-                        primaryColor: primaryColor,
-                        borderColor: borderColor,
-                        mutedForeground: mutedForeground,
-                        cardColor: cardColor,
-                      ),
-                      const SizedBox(height: 20),
-                      _buildInputField(
-                        label: ts.translate('phone'),
-                        placeholder: '••• •• •• ••',
-                        icon: Icons.phone_outlined,
-                        prefixText: _getCountryPrefix(),
-                        controller: _phoneController,
-                        primaryColor: primaryColor,
-                        borderColor: borderColor,
-                        mutedForeground: mutedForeground,
-                        cardColor: cardColor,
-                      ),
-                      const SizedBox(height: 20),
                       _buildInputField(
                         label: ts.translate('password'),
                         placeholder: '••••••••',
@@ -431,126 +400,115 @@ class _SignUpPageState extends State<SignUpPage> {
                         mutedForeground: mutedForeground,
                         cardColor: cardColor,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
+                      _buildCountryDropdown(
+                        label: ts.translate('country_residence'),
+                        primaryColor: primaryColor,
+                        borderColor: borderColor,
+                        mutedForeground: mutedForeground,
+                        cardColor: cardColor,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildInputField(
+                        label: ts.translate('phone_number'),
+                        placeholder: '690 00 00 00',
+                        icon: Icons.phone_android_rounded,
+                        controller: _phoneController,
+                        prefixText: _getCountryPrefix(),
+                        primaryColor: primaryColor,
+                        borderColor: borderColor,
+                        mutedForeground: mutedForeground,
+                        cardColor: cardColor,
+                      ),
+                      const SizedBox(height: 32),
                       
-                      // Terms
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: _acceptTerms,
-                              onChanged: (value) {
-                                setState(() {
-                                  _acceptTerms = value ?? false;
-                                });
-                              },
-                              activeColor: primaryColor,
-                              checkColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
+                          GestureDetector(
+                            onTap: () => setState(() => _acceptTerms = !_acceptTerms),
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: _acceptTerms ? primaryColor : borderColor),
+                                color: _acceptTerms ? primaryColor : Colors.transparent,
                               ),
-                              side: BorderSide(color: borderColor),
+                              child: _acceptTerms ? const Icon(Icons.check, size: 14, color: Colors.black) : null,
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: RichText(
-                              text: TextSpan(
-                                style: GoogleFonts.dmSans(
-                                  color: mutedForeground,
-                                  fontSize: 11,
-                                  height: 1.4,
+                            child: Wrap(
+                              children: [
+                                Text(
+                                  ts.translate('accept_terms_prefix'),
+                                  style: GoogleFonts.dmSans(color: mutedForeground, fontSize: 13),
                                 ),
-                                children: [
-                                  TextSpan(text: '${ts.translate('accept_terms_prefix')} '),
-                                  TextSpan(
-                                    text: ts.translate('terms_link'),
-                                    style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  onTap: () {},
+                                  child: Text(
+                                    ts.translate('terms_link'),
+                                    style: GoogleFonts.dmSans(color: primaryColor, fontSize: 13, fontWeight: FontWeight.bold),
                                   ),
-                                  TextSpan(text: ' ${ts.translate('and_label')} '),
-                                  TextSpan(
-                                    text: ts.translate('privacy_link'),
-                                    style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  ts.translate('and_label'),
+                                  style: GoogleFonts.dmSans(color: mutedForeground, fontSize: 13),
+                                ),
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  onTap: () {},
+                                  child: Text(
+                                    ts.translate('privacy_link'),
+                                    style: GoogleFonts.dmSans(color: primaryColor, fontSize: 13, fontWeight: FontWeight.bold),
                                   ),
-                                  const TextSpan(text: '.'),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 40),
                       
-                      // Sign Up Button
-                      GestureDetector(
-                        onTap: _isLoading ? null : _handleSignUp,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          decoration: BoxDecoration(
-                            color: _isLoading ? primaryColor.withOpacity(0.5) : primaryColor,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              if (!_isLoading)
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.2),
-                                  blurRadius: 30,
-                                  offset: const Offset(0, 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _handleSignUp,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 8,
+                            shadowColor: primaryColor.withOpacity(0.3),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                              : Text(
+                                  ts.translate('create_account_btn').toUpperCase(),
+                                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w900, letterSpacing: 2.0, fontSize: 12),
                                 ),
-                            ],
-                          ),
-                          child: Center(
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-                                    ),
-                                  )
-                                : Text(
-                                    ts.translate('create_account_btn'),
-                                    style: GoogleFonts.dmSans(
-                                      color: Colors.black,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 32),
                       
-                      // Login Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            ts.translate('already_have_account'),
-                            style: GoogleFonts.dmSans(
-                              color: mutedForeground,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pushNamed(context, '/login');
-                            },
-                            child: Text(
-                              ts.translate('log_in_btn'),
-                              style: GoogleFonts.dmSans(
-                                color: primaryColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: RichText(
+                          text: TextSpan(
+                            text: ts.translate('already_have_account'),
+                            style: GoogleFonts.dmSans(color: mutedForeground, fontSize: 14),
+                            children: [
+                              TextSpan(
+                                text: ' ${ts.translate('log_in_btn')}',
+                                style: GoogleFonts.dmSans(color: primaryColor, fontWeight: FontWeight.bold),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -599,7 +557,7 @@ class _SignUpPageState extends State<SignUpPage> {
           child: TextField(
             controller: controller,
             obscureText: isPassword,
-            keyboardType: label.toLowerCase().contains('téléphone') || label.toLowerCase().contains('phone') ? TextInputType.phone : null,
+            keyboardType: label.toLowerCase().contains('phone') ? TextInputType.phone : null,
             style: GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
             decoration: InputDecoration(
               hintText: placeholder,
@@ -657,7 +615,7 @@ class _SignUpPageState extends State<SignUpPage> {
               value: (_countries.any((c) => c['id'] == _selectedCountryId)) ? _selectedCountryId : null,
               isExpanded: true,
               hint: Text(
-                'Sélectionnez votre pays',
+                ts.translate('select_country'),
                 style: GoogleFonts.dmSans(
                   color: mutedForeground.withOpacity(0.4),
                   fontSize: 14,

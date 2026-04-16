@@ -22,7 +22,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   String selectedMake = 'brand';
   final _modelController = TextEditingController();
   String selectedYear = '2023 - 2026';
-  String selectedMileage = '0 - 10,000 km';
+  String selectedMileage = '0 - 10,000';
   final _requirementsController = TextEditingController();
 
   @override
@@ -56,7 +56,6 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         final year = args['year']?.toString();
         if (year != null) {
           int y = int.tryParse(year) ?? 2023;
-          // Find the best matching predefined range
           if (y >= 2023) {
             selectedYear = '2023 - 2026';
           } else if (y >= 2020) {
@@ -68,7 +67,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           }
         }
         
-        selectedMileage = (args['mileage'] ?? '0 - 10,000 km').toString();
+        String mileage = (args['mileage'] ?? '0 - 10,000').toString();
+        selectedMileage = mileage.replaceAll(' km', '').replaceAll(' KM', '');
       } else {
         // Standard edit mode
         _currentRangeValues = RangeValues(
@@ -79,7 +79,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         selectedMake = (args['make'] ?? 'brand').toString();
         _modelController.text = (args['model'] ?? '').toString();
         _requirementsController.text = (args['special_requirements'] ?? '').toString();
-        selectedMileage = (args['mileage'] ?? '0 - 10,000 km').toString();
+        
+        String mileage = (args['mileage'] ?? '0 - 10,000').toString();
+        selectedMileage = mileage.replaceAll(' km', '').replaceAll(' KM', '');
         
         if (args['year_min'] != null && args['year_max'] != null) {
           selectedYear = '${args['year_min']} - ${args['year_max']}';
@@ -242,23 +244,31 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         'year_max': yearMax,
         'currency': ts.currentCurrency,
         'mileage': selectedCondition == 'New' ? '0' : selectedMileage,
-        'exterior_color': colorNames[selectedColor]?[ts.currentLanguage] ?? 'Custom',
+        'exterior_color': colorNames[selectedColor]?[ts.currentLanguage] ?? ts.translate('custom'),
         'special_requirements': _requirementsController.text.trim(),
         'status': RequestStatus.initiated.dbValue,
       };
 
+      Map<String, dynamic> response;
       if (_editingRequest != null) {
-        await Supabase.instance.client
+        response = await Supabase.instance.client
             .schema('cartel')
             .from('requests')
             .update(data)
-            .eq('id', _editingRequest!['id']);
+            .eq('id', _editingRequest!['id'])
+            .select()
+            .single();
       } else {
-        await Supabase.instance.client.schema('cartel').from('requests').insert(data);
+        response = await Supabase.instance.client
+            .schema('cartel')
+            .from('requests')
+            .insert(data)
+            .select()
+            .single();
       }
 
       if (mounted) {
-        Navigator.pushNamed(context, '/payment');
+        Navigator.pushNamed(context, '/payment', arguments: response);
       }
     } catch (e) {
       if (mounted) {
@@ -424,7 +434,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ONBOARDING',
+                    ts.translate('onboarding').toUpperCase(),
                     style: GoogleFonts.dmSans(
                       color: mutedForeground,
                       fontSize: 10,
@@ -451,7 +461,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                 border: Border.all(color: primaryColor.withOpacity(0.2)),
               ),
               child: Text(
-                'Step 1 of 2',
+                '${ts.translate('step')} 1 ${ts.translate('of')} 2',
                 style: TextStyle(
                   color: primaryColor,
                   fontSize: 10,
@@ -493,7 +503,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   }
 
   Widget _buildVehicleIdentity(Color primaryColor, Color mutedForeground, TranslationService ts) {
-    final List<String> makes = ['brand', 'Audi', 'Bentley', 'BMW', 'BYD', 'Cadillac', 'Chevrolet', 'Chrysler', 'Citroën', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 'Geely', 'GMC', 'Honda', 'Hyundai', 'Isuzu', 'Jaguar', 'Jeep', 'Kia', 'Lamborghini', 'Land Rover', 'Lexus', 'Mahindra', 'Mazda', 'Mercedes‑Benz', 'Mini', 'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche', 'Range Rover', 'Renault', 'Rolls‑Royce', 'Subaru', 'Suzuki', 'Tata Motors', 'Tesla', 'Toyota', 'Volkswagen'];
+    final List<String> makes = [ts.translate('brand'), 'Audi', 'Bentley', 'BMW', 'BYD', 'Cadillac', 'Chevrolet', 'Chrysler', 'Citroën', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 'Geely', 'GMC', 'Honda', 'Hyundai', 'Isuzu', 'Jaguar', 'Jeep', 'Kia', 'Lamborghini', 'Land Rover', 'Lexus', 'Mahindra', 'Mazda', 'Mercedes‑Benz', 'Mini', 'Mitsubishi', 'Nissan', 'Peugeot', 'Porsche', 'Range Rover', 'Renault', 'Rolls‑Royce', 'Subaru', 'Suzuki', 'Tata Motors', 'Tesla', 'Toyota', 'Volkswagen'];
     if (!makes.contains(selectedMake)) {
       makes.insert(0, selectedMake);
     }
@@ -508,14 +518,14 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             Expanded(
               child: _buildDropdownField(
                 ts.translate('make'),
-                selectedMake,
+                selectedMake == 'brand' ? ts.translate('brand') : selectedMake,
                 makes,
                 onChanged: (val) => setState(() => selectedMake = val!),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildTextField(ts.translate('model'), 'e.g. Urus', controller: _modelController),
+              child: _buildTextField(ts.translate('model'), ts.translate('e_g_urus'), controller: _modelController),
             ),
           ],
         ),
@@ -664,8 +674,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   Widget _buildMileageRange(Color primaryColor, Color mutedForeground, TranslationService ts) {
     bool isNew = selectedCondition == 'New';
-    final List<String> mileageOptions = ['0 km', '0 - 10,000 km', '10,000 - 30,000 km', '30,000 - 60,000 km', '60,000+ km'];
-    String currentVal = isNew ? '0 km' : selectedMileage;
+    final List<String> mileageOptions = ['0', '0 - 10,000', '10,000 - 30,000', '30,000 - 60,000', '60,000+'];
+    String currentVal = isNew ? '0' : selectedMileage;
     if (!mileageOptions.contains(currentVal)) {
       mileageOptions.insert(0, currentVal);
     }
@@ -681,6 +691,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           mileageOptions,
           icon: Icons.speed_rounded,
           enabled: !isNew,
+          itemLabelBuilder: (val) => '$val ${ts.translate('kilometers')}',
           onChanged: (val) => setState(() => selectedMileage = val!),
         ),
       ],
@@ -956,7 +967,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     );
   }
 
-  Widget _buildDropdownField(String label, String value, List<String> items, {IconData? icon, bool enabled = true, ValueChanged<String?>? onChanged}) {
+  Widget _buildDropdownField(String label, String value, List<String> items,
+      {IconData? icon, bool enabled = true, ValueChanged<String?>? onChanged, String Function(String)? itemLabelBuilder}) {
     return Stack(
       children: [
         Opacity(
@@ -988,7 +1000,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
               items: items.map((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
-                  child: Text(value),
+                  child: Text(itemLabelBuilder != null ? itemLabelBuilder(value) : value),
                 );
               }).toList(),
               onChanged: enabled ? onChanged : null,

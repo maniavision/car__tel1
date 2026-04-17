@@ -8,13 +8,15 @@ import 'package:car/services/translation_service.dart';
 import 'package:car/services/notification_service.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final SupabaseClient? supabaseClient;
+  const ProfilePage({super.key, this.supabaseClient});
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  late final SupabaseClient _supabase;
   final ts = TranslationService();
   bool _isUploading = false;
   Map<String, dynamic>? _profileData;
@@ -23,15 +25,16 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    _supabase = widget.supabaseClient ?? Supabase.instance.client;
     _fetchProfile();
   }
 
   Future<void> _fetchProfile() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) return;
 
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('profiles')
           .select('*, country:country_calling_codes(country_name, iso_alpha_2)')
@@ -124,7 +127,7 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isUploading = true);
 
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) return;
 
       final file = File(image.path);
@@ -132,20 +135,20 @@ class _ProfilePageState extends State<ProfilePage> {
       final fileName = 'avatar.$fileExt';
       final filePath = '${user.id}/$fileName';
 
-      await Supabase.instance.client.storage.from('profiles').upload(
+      await _supabase.storage.from('profiles').upload(
             filePath,
             file,
             fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
           );
 
-      final String publicUrl = Supabase.instance.client.storage.from('profiles').getPublicUrl(filePath);
+      final String publicUrl = _supabase.storage.from('profiles').getPublicUrl(filePath);
 
-      await Supabase.instance.client
+      await _supabase
           .schema('cartel')
           .from('profiles')
           .update({'avatar_url': publicUrl}).eq('id', user.id);
 
-      await Supabase.instance.client.auth.updateUser(
+      await _supabase.auth.updateUser(
         UserAttributes(
           data: {
             'avatar_url': publicUrl,
@@ -181,7 +184,7 @@ class _ProfilePageState extends State<ProfilePage> {
     const borderColor = Color(0xFF222222);
     const secondaryColor = Color(0xFF1A1A1A);
 
-    final user = Supabase.instance.client.auth.currentUser;
+    final user = _supabase.auth.currentUser;
 
     return ListenableBuilder(
       listenable: ts,
@@ -391,7 +394,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                countryDisplay.toUpperCase(),
+                countryDisplay,
                 style: GoogleFonts.dmSans(
                   color: mutedForeground,
                   fontSize: 10,

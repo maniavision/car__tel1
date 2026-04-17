@@ -3,9 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:car/models/notification_model.dart';
 
 class NotificationService extends ChangeNotifier {
-  static final NotificationService _instance = NotificationService._internal();
+  static NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+
+  @visibleForTesting
+  static void setMockInstance(NotificationService mock) {
+    _instance = mock;
+  }
 
   final SupabaseClient _supabase = Supabase.instance.client;
   List<NotificationModel> _notifications = [];

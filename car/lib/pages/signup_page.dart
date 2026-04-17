@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,13 +9,15 @@ import 'package:car/services/stripe_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignUpPage extends StatefulWidget {
-  const SignUpPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const SignUpPage({super.key, this.supabaseClient});
 
   @override
   State<SignUpPage> createState() => _SignUpPageState();
 }
 
 class _SignUpPageState extends State<SignUpPage> {
+  SupabaseClient get _supabase => widget.supabaseClient ?? Supabase.instance.client;
   final ts = TranslationService();
   bool _acceptTerms = false;
   bool _isLoading = false;
@@ -26,16 +29,75 @@ class _SignUpPageState extends State<SignUpPage> {
   
   List<Map<String, dynamic>> _countries = [];
   int? _selectedCountryId;
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _fetchCountries();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    _authSubscription = _supabase.auth.onAuthStateChange.listen((data) async {
+      final AuthChangeEvent event = data.event;
+      final Session? session = data.session;
+      
+      if (event == AuthChangeEvent.signedIn && session != null) {
+        // Check if profile exists, if not create basic one (important for social sign-in)
+        try {
+          final user = session.user;
+          final profile = await _supabase
+              .schema('cartel')
+              .from('profiles')
+              .select()
+              .eq('id', user.id)
+              .maybeSingle();
+
+          if (profile == null) {
+            await _supabase.schema('cartel').from('profiles').upsert({
+              'id': user.id,
+              'full_name': user.userMetadata?['full_name'] ?? user.email?.split('@')[0],
+              'email': user.email,
+              'avatar_url': user.userMetadata?['avatar_url'],
+              'type': 'Client',
+            });
+          }
+        } catch (e) {
+          debugPrint('Error ensuring profile exists: $e');
+        }
+
+        NotificationService().init();
+        // StripeService().initialize();
+        await TranslationService().loadUserPreferences();
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      }
+    });
+  }
+
+  Future<void> _handleSocialLogin(OAuthProvider provider) async {
+    setState(() => _isLoading = true);
+    try {
+      await _supabase.auth.signInWithOAuth(
+        provider,
+        redirectTo: 'cartel://login-callback',
+      );
+    } catch (e) {
+      if (mounted) {
+        final message = e is AuthException ? e.message : ts.translate('error_occurred');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _fetchCountries() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('country_calling_codes')
           .select('id, country_name, calling_code')
@@ -129,13 +191,13 @@ class _SignUpPageState extends State<SignUpPage> {
       final fileName = 'avatar.$fileExt';
       final filePath = '$userId/$fileName';
 
-      await Supabase.instance.client.storage.from('profiles').upload(
+      await _supabase.storage.from('profiles').upload(
             filePath,
             file,
             fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
           );
 
-      final String publicUrl = Supabase.instance.client.storage.from('profiles').getPublicUrl(filePath);
+      final String publicUrl = _supabase.storage.from('profiles').getPublicUrl(filePath);
       return publicUrl;
     } catch (e) {
       return null;
@@ -180,7 +242,7 @@ class _SignUpPageState extends State<SignUpPage> {
     final fullPhone = '${_getCountryPrefix()} ${_phoneController.text.trim()}';
 
     try {
-      final response = await Supabase.instance.client.auth.signUp(
+      final response = await _supabase.auth.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         data: {
@@ -192,7 +254,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
       if (response.user != null) {
         try {
-          await Supabase.instance.client.schema('cartel').from('profiles').upsert({
+          await _supabase.schema('cartel').from('profiles').upsert({
             'id': response.user!.id,
             'full_name': _fullNameController.text.trim(),
             'email': _emailController.text.trim(),
@@ -206,7 +268,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
         final avatarUrl = await _uploadAvatar(response.user!.id);
         if (avatarUrl != null) {
-          await Supabase.instance.client.auth.updateUser(
+          await _supabase.auth.updateUser(
             UserAttributes(
               data: {
                 'avatar_url': avatarUrl,
@@ -243,6 +305,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _fullNameController.dispose();
@@ -371,7 +434,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       
                       _buildInputField(
                         label: ts.translate('full_name'),
-                        placeholder: 'Fortune Niama',
+                        placeholder: 'John Doe',
                         icon: Icons.person_outline_rounded,
                         controller: _fullNameController,
                         primaryColor: primaryColor,
@@ -490,13 +553,65 @@ class _SignUpPageState extends State<SignUpPage> {
                           child: _isLoading
                               ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
                               : Text(
-                                  ts.translate('create_account_btn').toUpperCase(),
+                                  ts.translate('create_account_btn'),
                                   style: GoogleFonts.montserrat(fontWeight: FontWeight.w900, letterSpacing: 2.0, fontSize: 12),
                                 ),
                         ),
                       ),
                       const SizedBox(height: 32),
                       
+                      // Divider
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: borderColor.withOpacity(0.4))),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              ts.translate('or_continue_with'),
+                              style: GoogleFonts.dmSans(
+                                color: mutedForeground,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: borderColor.withOpacity(0.4))),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Social Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _handleSocialLogin(OAuthProvider.google),
+                              child: _buildSocialButton(
+                                icon: 'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
+                                label: ts.translate('google'),
+                                borderColor: borderColor,
+                                cardColor: cardColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _handleSocialLogin(OAuthProvider.apple),
+                              child: _buildSocialButton(
+                                icon: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg',
+                                label: ts.translate('apple'),
+                                borderColor: borderColor,
+                                cardColor: cardColor,
+                                isApple: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: RichText(
@@ -541,7 +656,7 @@ class _SignUpPageState extends State<SignUpPage> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            label.toUpperCase(),
+            label,
             style: GoogleFonts.dmSans(
               color: primaryColor,
               fontSize: 10,
@@ -596,7 +711,7 @@ class _SignUpPageState extends State<SignUpPage> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            label.toUpperCase(),
+            label,
             style: GoogleFonts.dmSans(
               color: primaryColor,
               fontSize: 10,
@@ -652,6 +767,38 @@ class _SignUpPageState extends State<SignUpPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSocialButton({
+    required String icon,
+    required String label,
+    required Color borderColor,
+    required Color cardColor,
+    bool isApple = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        color: cardColor.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor.withOpacity(0.6)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(isApple ? Icons.apple : Icons.g_mobiledata, color: Colors.white, size: 24),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: GoogleFonts.dmSans(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

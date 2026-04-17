@@ -6,13 +6,15 @@ import 'package:car/services/translation_service.dart';
 import 'package:car/models/request_status.dart';
 
 class CreateRequestPage extends StatefulWidget {
-  const CreateRequestPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const CreateRequestPage({super.key, this.supabaseClient});
 
   @override
   State<CreateRequestPage> createState() => _CreateRequestPageState();
 }
 
 class _CreateRequestPageState extends State<CreateRequestPage> {
+  late final SupabaseClient _supabase;
   RangeValues _currentRangeValues = const RangeValues(25000000, 75000000);
   String selectedCondition = 'New';
   Color selectedColor = Colors.black;
@@ -24,6 +26,12 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   String selectedYear = '2023 - 2026';
   String selectedMileage = '0 - 10,000';
   final _requirementsController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _supabase = widget.supabaseClient ?? Supabase.instance.client;
+  }
 
   @override
   void didChangeDependencies() {
@@ -217,7 +225,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     setState(() => _isLoading = true);
     
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) {
         Navigator.pushNamed(context, '/login');
         return;
@@ -251,7 +259,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
       Map<String, dynamic> response;
       if (_editingRequest != null) {
-        response = await Supabase.instance.client
+        response = await _supabase
             .schema('cartel')
             .from('requests')
             .update(data)
@@ -259,7 +267,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             .select()
             .single();
       } else {
-        response = await Supabase.instance.client
+        response = await _supabase
             .schema('cartel')
             .from('requests')
             .insert(data)
@@ -434,7 +442,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    ts.translate('onboarding').toUpperCase(),
+                    ts.translate('onboarding'),
                     style: GoogleFonts.dmSans(
                       color: mutedForeground,
                       fontSize: 10,
@@ -778,7 +786,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                     ),
                   ),
                   Text(
-                    selectedColorName.toUpperCase(),
+                    selectedColorName,
                     style: GoogleFonts.dmSans(
                       color: primaryColor,
                       fontSize: 10,
@@ -913,7 +921,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   Widget _buildLabel(String text, Color mutedForeground) {
     return Text(
-      text.toUpperCase(),
+      text,
       style: GoogleFonts.montserrat(
         color: mutedForeground.withOpacity(0.8),
         fontSize: 10,
@@ -955,7 +963,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             left: 16,
             top: 8,
             child: Text(
-              label.toUpperCase(),
+              label,
               style: GoogleFonts.dmSans(
                 color: const Color(0xFF888888).withOpacity(0.6),
                 fontSize: 8,
@@ -1013,7 +1021,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             left: 16,
             top: 8,
             child: Text(
-              label.toUpperCase(),
+              label,
               style: GoogleFonts.dmSans(
                 color: const Color(0xFF888888).withOpacity(0.6),
                 fontSize: 8,

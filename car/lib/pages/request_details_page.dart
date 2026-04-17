@@ -4,18 +4,26 @@ import 'package:car/services/translation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RequestDetailsPage extends StatefulWidget {
-  const RequestDetailsPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const RequestDetailsPage({super.key, this.supabaseClient});
 
   @override
   State<RequestDetailsPage> createState() => _RequestDetailsPageState();
 }
 
 class _RequestDetailsPageState extends State<RequestDetailsPage> {
+  late final SupabaseClient _supabase;
   final ts = TranslationService();
   List<Map<String, dynamic>> _matches = [];
   bool _isLoadingMatches = false;
   Map<String, dynamic>? _request;
   bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _supabase = widget.supabaseClient ?? Supabase.instance.client;
+  }
 
   @override
   void didChangeDependencies() {
@@ -35,7 +43,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
 
     setState(() => _isLoadingMatches = true);
     try {
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('matches')
           .select()
@@ -89,22 +97,15 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     if (confirm != true) return;
 
     try {
-      final supabase = Supabase.instance.client;
-      
-      // Show loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ts.translate('traitement'))),
-      );
-
       // 1. Update the match status to Accepted
-      await supabase
+      await _supabase
           .schema('cartel')
           .from('matches')
           .update({'status': 'Accepted'})
           .eq('id', match['id']);
 
       // 2. Update the request status to Complete
-      await supabase
+      await _supabase
           .schema('cartel')
           .from('requests')
           .update({
@@ -164,15 +165,13 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     if (confirm != true) return;
 
     try {
-      final supabase = Supabase.instance.client;
-      
       // Show loading
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ts.translate('traitement'))),
       );
 
       // Update the match status to Declined
-      await supabase
+      await _supabase
           .schema('cartel')
           .from('matches')
           .update({'status': 'Declined'})
@@ -325,7 +324,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                                 spacing: 8,
                                 runSpacing: 8,
                                 children: [
-                                  _buildBadge(ts.translate('cartel_search').toUpperCase(), primaryColor, primaryColor.withValues(alpha: 0.1)),
+                                  _buildBadge(ts.translate('cartel_search'), primaryColor, primaryColor.withValues(alpha: 0.1)),
                                   _buildBadge(id, mutedForeground, const Color(0xFF1F1F1F)),
                                 ],
                               ),
@@ -349,7 +348,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              ts.translate('searching').toUpperCase(),
+                              ts.translate('searching'),
                               style: GoogleFonts.plusJakartaSans(
                                 color: primaryColor,
                                 fontSize: 8,
@@ -383,7 +382,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         const SizedBox(height: 32),
 
         // Status Timeline
-        _buildSectionTitle('${ts.translate('statut').toUpperCase()} ${ts.translate('file_status').toUpperCase()}', mutedForeground),
+        _buildSectionTitle('${ts.translate('statut')} ${ts.translate('file_status')}', mutedForeground),
         const SizedBox(height: 16),
         _buildTimeline(primaryColor, cardColor, borderColor, mutedForeground, ts, request),
 
@@ -391,7 +390,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
 
         // Agent Section
         if (request?['agent_id'] != null) ...[
-          _buildSectionTitle(ts.translate('agent_responsable').toUpperCase(), mutedForeground),
+          _buildSectionTitle(ts.translate('agent_responsable'), mutedForeground),
           const SizedBox(height: 16),
           _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request),
         ],
@@ -404,7 +403,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
           child: TextButton.icon(
             onPressed: () {},
             icon: const Icon(Icons.delete_outline_rounded, size: 20),
-            label: Text(ts.translate('cancel_request').toUpperCase()),
+            label: Text(ts.translate('cancel_request')),
             style: TextButton.styleFrom(
               backgroundColor: const Color(0xFF1F1F1F),
               foregroundColor: mutedForeground,
@@ -471,7 +470,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                               const SizedBox(height: 12),
                               Row(
                                 children: [
-                                  _buildBadge(ts.translate('all').toUpperCase(), primaryColor, primaryColor.withOpacity(0.1)),
+                                  _buildBadge(ts.translate('all'), primaryColor, primaryColor.withOpacity(0.1)),
                                   const SizedBox(width: 8),
                                   _buildBadge(id, mutedForeground, const Color(0xFF1F1F1F)),
                                 ],
@@ -496,7 +495,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              ts.translate('trouve').toUpperCase(),
+                              ts.translate('trouve'),
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.green,
                                 fontSize: 8,
@@ -565,7 +564,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
 
         // Agent Section
         if (request?['agent_id'] != null) ...[
-          _buildSectionTitle(ts.translate('agent_responsable').toUpperCase(), mutedForeground),
+          _buildSectionTitle(ts.translate('agent_responsable'), mutedForeground),
           const SizedBox(height: 16),
           _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request),
         ],
@@ -578,7 +577,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     final title = '${match['make']} ${match['model']}';
     final price = (match['final_price'] ?? 0).toDouble();
     final priceStr = ts.formatPrice(price);
-    final subtitle = '${match['year']} • ${match['mileage']?.toString() ?? '0'} ${ts.translate('kilometers').toUpperCase()} • ${ts.translate(match['engine']?.toString().toLowerCase() == 'essence' ? 'fuel_petrol' : (match['engine']?.toString().toLowerCase() == 'diesel' ? 'fuel_diesel' : (match['engine']?.toString().toLowerCase() == 'électrique' ? 'fuel_electric' : 'fuel_petrol')))}';
+    final subtitle = '${match['year']} • ${match['mileage']?.toString() ?? '0'} ${ts.translate('kilometers')} • ${ts.translate(match['engine']?.toString().toLowerCase() == 'essence' ? 'fuel_petrol' : (match['engine']?.toString().toLowerCase() == 'diesel' ? 'fuel_diesel' : (match['engine']?.toString().toLowerCase() == 'électrique' ? 'fuel_electric' : 'fuel_petrol')))}';
     final imageUrl = (match['image_urls'] != null && match['image_urls'] is List && (match['image_urls'] as List).isNotEmpty)
         ? (match['image_urls'] as List).first.toString()
         : 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/components/Xxui1AANB7v.png';
@@ -628,7 +627,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
             const Icon(Icons.check_circle_rounded, color: Colors.green, size: 32),
             const SizedBox(height: 4),
             Text(
-              ts.translate('accepter').toUpperCase(),
+              ts.translate('accepter'),
               style: GoogleFonts.plusJakartaSans(
                 color: Colors.green,
                 fontSize: 10,
@@ -651,7 +650,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
             const Icon(Icons.cancel_rounded, color: Colors.red, size: 32),
             const SizedBox(height: 4),
             Text(
-              ts.translate('refuser').toUpperCase(),
+              ts.translate('refuser'),
               style: GoogleFonts.plusJakartaSans(
                 color: Colors.red,
                 fontSize: 10,
@@ -727,7 +726,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'TOP MATCH',
+                          'Top Match',
                           style: GoogleFonts.plusJakartaSans(
                             color: Colors.black,
                             fontSize: 8,
@@ -750,7 +749,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                               border: Border.all(color: Colors.white.withOpacity(0.2)),
                             ),
                             child: Text(
-                              'HORS BUDGET',
+                              'Hors Budget',
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.white,
                                 fontSize: 10,
@@ -780,7 +779,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      subtitle.toUpperCase(),
+                      subtitle,
                       style: GoogleFonts.plusJakartaSans(
                         color: mutedForeground,
                         fontSize: 10,
@@ -804,7 +803,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                             const Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
                             const SizedBox(width: 8),
                             Text(
-                              ts.translate('match_accepte').toUpperCase(),
+                              ts.translate('match_accepte'),
                               style: GoogleFonts.plusJakartaSans(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11),
                             ),
                           ],
@@ -825,7 +824,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                             const Icon(Icons.cancel_rounded, color: Colors.red, size: 16),
                             const SizedBox(width: 8),
                             Text(
-                              ts.translate('match_refuse').toUpperCase(),
+                              ts.translate('match_refuse'),
                               style: GoogleFonts.plusJakartaSans(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 11),
                             ),
                           ],
@@ -839,7 +838,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              (ts.translate('swipe_to_decide') ?? 'SWIPE TO DECIDE').toUpperCase(),
+                              (ts.translate('swipe_to_decide') ?? 'Swipe to decide'),
                               textAlign: TextAlign.center,
                               style: GoogleFonts.plusJakartaSans(
                                 color: mutedForeground,
@@ -868,7 +867,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label.toUpperCase(),
+          label,
           style: GoogleFonts.plusJakartaSans(
             color: labelColor,
             fontSize: 9,
@@ -1106,7 +1105,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         border: Border.all(color: textColor.withOpacity(0.2)),
       ),
       child: Text(
-        label.toUpperCase(),
+        label,
         style: GoogleFonts.plusJakartaSans(
           color: textColor,
           fontSize: 9,

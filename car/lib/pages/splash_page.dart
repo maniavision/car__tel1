@@ -7,13 +7,15 @@ import 'package:car/services/translation_service.dart';
 import 'package:car/services/stripe_service.dart';
 
 class SplashPage extends StatefulWidget {
-  const SplashPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const SplashPage({super.key, this.supabaseClient});
 
   @override
   State<SplashPage> createState() => _SplashPageState();
 }
 
 class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
+  SupabaseClient get _supabase => widget.supabaseClient ?? Supabase.instance.client;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   late AnimationController _bounceController;
@@ -171,7 +173,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
-                        final session = Supabase.instance.client.auth.currentSession;
+                        final session = _supabase.auth.currentSession;
                         if (session != null) {
                           NotificationService().init();
                           StripeService().initialize();

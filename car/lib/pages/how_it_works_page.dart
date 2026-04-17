@@ -253,7 +253,7 @@ class HowItWorksPage extends StatelessWidget {
               children: [
                 const SizedBox(height: 8),
                 Text(
-                  title.toUpperCase(),
+                  title,
                   style: GoogleFonts.montserrat(
                     color: Colors.white,
                     fontSize: 15,

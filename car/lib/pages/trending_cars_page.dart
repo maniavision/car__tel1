@@ -90,7 +90,7 @@ class _TrendingCarsPageState extends State<TrendingCarsPage> {
               ),
             ),
             title: Text(
-              ts.translate('trending_now').toUpperCase(),
+              ts.translate('trending_now'),
               style: GoogleFonts.montserrat(
                 color: Colors.white,
                 fontSize: 16,
@@ -147,7 +147,7 @@ class _TrendingCarsPageState extends State<TrendingCarsPage> {
                           border: isSelected ? null : Border.all(color: borderColor),
                         ),
                         child: Text(
-                          filter['label']!.toUpperCase(),
+                          filter['label']!,
                           style: GoogleFonts.dmSans(
                             color: isSelected ? Colors.black : Colors.white,
                             fontSize: 11,
@@ -325,7 +325,7 @@ class _TrendingCarCardState extends State<TrendingCarCard> {
                         border: Border.all(color: Colors.white.withOpacity(0.1)),
                       ),
                       child: Text(
-                        widget.badge.toUpperCase(),
+                        widget.badge,
                         style: GoogleFonts.dmSans(
                           color: widget.primaryColor,
                           fontSize: 10,
@@ -393,7 +393,7 @@ class _TrendingCarCardState extends State<TrendingCarCard> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              widget.subtitle.toUpperCase(),
+                              widget.subtitle,
                               style: GoogleFonts.dmSans(
                                 color: widget.mutedForeground,
                                 fontSize: 11,

@@ -48,6 +48,14 @@ class NotificationModel {
     if (language == 'Français' && titleFr != null && titleFr!.isNotEmpty) {
       return titleFr!;
     }
+    
+    // Fallback for English if titleEn is missing
+    if (language == 'English') {
+      if (type.toLowerCase() == 'match' || type.toLowerCase() == 'found') return 'New Vehicle Match';
+      if (type.toLowerCase() == 'assignment') return 'Agent Assigned';
+      if (type.toLowerCase() == 'payment') return 'Payment Confirmed';
+    }
+    
     return title;
   }
 
@@ -58,6 +66,14 @@ class NotificationModel {
     if (language == 'Français' && descriptionFr != null && descriptionFr!.isNotEmpty) {
       return descriptionFr!;
     }
+    
+    // Fallback for English if descriptionEn is missing
+    if (language == 'English') {
+      if (type.toLowerCase() == 'match' || type.toLowerCase() == 'found') return 'A new match has been found for your request.';
+      if (type.toLowerCase() == 'assignment') return 'An agent has been assigned to your request.';
+      if (type.toLowerCase() == 'payment') return 'Your payment has been successfully processed.';
+    }
+    
     return description;
   }
 

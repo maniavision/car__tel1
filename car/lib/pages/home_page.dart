@@ -7,13 +7,15 @@ import 'package:car/services/notification_service.dart';
 import 'dart:async';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final SupabaseClient? supabaseClient;
+  const HomePage({super.key, this.supabaseClient});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  SupabaseClient get _supabase => widget.supabaseClient ?? Supabase.instance.client;
   late ScrollController _scrollController;
   late ScrollController _hotDealsScrollController;
   Timer? _timer;
@@ -46,7 +48,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _fetchTestimonials() async {
     try {
       // 1. Fetch testimonials
-      final testimonialsResponse = await Supabase.instance.client
+      final testimonialsResponse = await _supabase
           .schema('cartel')
           .from('testimonials')
           .select('*')
@@ -72,7 +74,7 @@ class _HomePageState extends State<HomePage> {
       
       if (locationIds.isNotEmpty) {
         // 3. Fetch country names
-        final countriesResponse = await Supabase.instance.client
+        final countriesResponse = await _supabase
             .schema('cartel')
             .from('country_calling_codes')
             .select('id, country_name')
@@ -110,10 +112,10 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchProfile() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) return;
 
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('profiles')
           .select('full_name, avatar_url')
@@ -132,7 +134,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchHotDeals() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('car_deal')
           .select()
@@ -156,7 +158,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _fetchTrendingCars() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('trending_cars')
           .select()
@@ -218,7 +220,7 @@ class _HomePageState extends State<HomePage> {
     const secondaryColor = Color(0xFF1A1A1A);
 
     final ts = TranslationService();
-    final user = Supabase.instance.client.auth.currentUser;
+    final user = _supabase.auth.currentUser;
 
     return ListenableBuilder(
       listenable: ts,
@@ -428,7 +430,7 @@ class _HomePageState extends State<HomePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  ts.translate('note_logistique').toUpperCase(),
+                                  ts.translate('note_logistique'),
                                   style: GoogleFonts.dmSans(
                                     color: primaryColor,
                                     fontSize: 9,
@@ -527,7 +529,7 @@ class _HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      ts.translate('trending_now').toUpperCase(),
+                      ts.translate('trending_now'),
                       style: GoogleFonts.montserrat(
                         color: primaryColor,
                         fontSize: 12,
@@ -538,7 +540,7 @@ class _HomePageState extends State<HomePage> {
                     GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/trending'),
                       child: Text(
-                        ts.translate('view_all').toUpperCase(),
+                        ts.translate('view_all'),
                         style: GoogleFonts.dmSans(
                           color: mutedForeground,
                           fontSize: 10,
@@ -621,7 +623,7 @@ class _HomePageState extends State<HomePage> {
                         const Icon(Icons.fireplace_rounded, color: Colors.redAccent, size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          ts.translate('hot_deals').toUpperCase(),
+                          ts.translate('hot_deals'),
                           style: GoogleFonts.montserrat(
                             color: primaryColor,
                             fontSize: 12,
@@ -634,7 +636,7 @@ class _HomePageState extends State<HomePage> {
                     GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/deals'),
                       child: Text(
-                        ts.translate('view_all').toUpperCase(),
+                        ts.translate('view_all'),
                         style: GoogleFonts.dmSans(
                           color: mutedForeground,
                           fontSize: 10,
@@ -690,7 +692,7 @@ class _HomePageState extends State<HomePage> {
                                 '${car['make']} ${car['model']}',
                                 ts.formatPrice(finalPrice),
                                 ts.formatPrice(oldPrice),
-                                '${car['mileage'] ?? 0} ${ts.translate('kilometers').toUpperCase()}',
+                                '${car['mileage'] ?? 0} ${ts.translate('kilometers')}',
                                 car['year']?.toString() ?? '',
                                 imageUrl,
                                 primaryColor,
@@ -710,7 +712,7 @@ class _HomePageState extends State<HomePage> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Text(
-                    ts.translate('experiences_clients').toUpperCase(),
+                    ts.translate('experiences_clients'),
                     style: GoogleFonts.montserrat(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 12,
@@ -807,7 +809,7 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        '${t['client_name'].toString().toUpperCase()}, ${t['display_location'].toString().toUpperCase()}',
+                                        '${t['client_name']}, ${t['display_location']}',
                                         style: GoogleFonts.dmSans(
                                           color: Colors.white.withOpacity(0.7),
                                           fontSize: 10,
@@ -945,7 +947,7 @@ class _HomePageState extends State<HomePage> {
                         border: Border.all(color: Colors.white.withOpacity(0.1)),
                       ),
                       child: Text(
-                        year.toUpperCase(),
+                        year,
                         style: GoogleFonts.dmSans(
                           color: primaryColor,
                           fontSize: 9,
@@ -1090,7 +1092,7 @@ class _HomePageState extends State<HomePage> {
                         border: Border.all(color: Colors.white.withOpacity(0.1)),
                       ),
                       child: Text(
-                        year.toUpperCase(),
+                        year,
                         style: GoogleFonts.dmSans(
                           color: primaryColor,
                           fontSize: 9,

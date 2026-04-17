@@ -3,9 +3,14 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StripeService {
-  static final StripeService _instance = StripeService._internal();
+  static StripeService _instance = StripeService._internal();
   factory StripeService() => _instance;
   StripeService._internal();
+
+  @visibleForTesting
+  static void setMockInstance(StripeService mock) {
+    _instance = mock;
+  }
 
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;

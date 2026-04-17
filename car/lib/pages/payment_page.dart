@@ -5,15 +5,23 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PaymentPage extends StatefulWidget {
-  const PaymentPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const PaymentPage({super.key, this.supabaseClient});
 
   @override
   State<PaymentPage> createState() => _PaymentPageState();
 }
 
 class _PaymentPageState extends State<PaymentPage> {
+  late final SupabaseClient _supabase;
   bool _isLoading = false;
   Map<String, dynamic>? _request;
+
+  @override
+  void initState() {
+    super.initState();
+    _supabase = widget.supabaseClient ?? Supabase.instance.client;
+  }
 
   @override
   void didChangeDependencies() {
@@ -84,7 +92,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Future<Map<String, dynamic>> _createPaymentIntent(String amount, String currency) async {
     try {
-      final response = await Supabase.instance.client.functions.invoke(
+      final response = await _supabase.functions.invoke(
         'stripe-payment',
         body: {
           'action': 'create-payment-intent',
@@ -117,7 +125,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
       // Payment successful!
       // 4. Update database
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       debugPrint('Current user: ${user?.id}');
       debugPrint('Request object: $_request');
 
@@ -125,7 +133,7 @@ class _PaymentPageState extends State<PaymentPage> {
         try {
           // Update request status
           debugPrint('Updating request status in cartel.requests...');
-          await Supabase.instance.client.schema('cartel').from('requests').update({
+          await _supabase.schema('cartel').from('requests').update({
             'payment_status': 'paid',
           }).eq('id', _request!['id']);
           debugPrint('Request status updated successfully');
@@ -225,7 +233,7 @@ class _PaymentPageState extends State<PaymentPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '${ts.translate('step')} 2 ${ts.translate('of')} 2'.toUpperCase(),
+                                '${ts.translate('step')} 2 ${ts.translate('of')} 2',
                                 style: GoogleFonts.plusJakartaSans(
                                   color: primaryColor,
                                   fontSize: 10,
@@ -332,7 +340,7 @@ class _PaymentPageState extends State<PaymentPage> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        ts.translate('service_fee').toUpperCase(),
+                                        ts.translate('service_fee'),
                                         style: GoogleFonts.plusJakartaSans(
                                           color: mutedForeground,
                                           fontSize: 9,
@@ -495,7 +503,7 @@ class _PaymentPageState extends State<PaymentPage> {
                                 const Icon(Icons.lock_rounded, size: 18),
                               const SizedBox(width: 12),
                               Text(
-                                '${ts.translate('pay_amount')} ${ts.formatPrice(30000)}'.toUpperCase(),
+                                '${ts.translate('pay_amount')} ${ts.formatPrice(30000)}',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w900,

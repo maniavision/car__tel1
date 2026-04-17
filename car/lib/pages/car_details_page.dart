@@ -5,13 +5,15 @@ import 'package:car/services/translation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CarDetailsPage extends StatefulWidget {
-  const CarDetailsPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const CarDetailsPage({super.key, this.supabaseClient});
 
   @override
   State<CarDetailsPage> createState() => _CarDetailsPageState();
 }
 
 class _CarDetailsPageState extends State<CarDetailsPage> {
+  SupabaseClient get _supabase => widget.supabaseClient ?? Supabase.instance.client;
   final ts = TranslationService();
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
@@ -142,7 +144,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      model.toUpperCase(),
+                      model,
                       style: GoogleFonts.montserrat(
                         color: Colors.white,
                         fontSize: 40,
@@ -155,7 +157,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      make.toUpperCase(),
+                      make,
                       style: GoogleFonts.plusJakartaSans(
                         color: mutedForeground,
                         fontSize: 20,
@@ -182,7 +184,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                       ),
                     ),
                     Text(
-                      ts.translate('prix_exportation').toUpperCase(),
+                      ts.translate('prix_exportation'),
                       style: GoogleFonts.plusJakartaSans(
                         color: mutedForeground,
                         fontSize: 9,
@@ -409,7 +411,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
         ),
         const SizedBox(width: 12),
         Text(
-          title.toUpperCase(),
+          title,
           style: GoogleFonts.montserrat(
             color: Colors.white,
             fontSize: 16,
@@ -550,7 +552,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
 
                           setState(() => _isProcessing = true);
                           try {
-                            final supabase = Supabase.instance.client;
+                            final supabase = _supabase;
                             final matchId = args['id'];
                             final requestId = args['request_id'];
 
@@ -600,7 +602,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                         child: _isProcessing
                             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : Text(
-                                ts.translate('accepter').toUpperCase(),
+                                ts.translate('accepter'),
                                 style: GoogleFonts.montserrat(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2.0),
                               ),
                       ),
@@ -614,15 +616,15 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                         onPressed: _isProcessing ? null : () async {
                           setState(() => _isProcessing = true);
                           try {
-                            final user = Supabase.instance.client.auth.currentUser;
+                            final user = _supabase.auth.currentUser;
                             if (user == null) return;
 
                             final carDealId = args['car_deal_id'] ?? args['id'];
-                            await Supabase.instance.client.schema('cartel').from('car_deal').update({
+                            await _supabase.schema('cartel').from('car_deal').update({
                               'number_people_interested': (args['number_people_interested'] ?? 0) + 1
                             }).eq('id', carDealId);
 
-                            await Supabase.instance.client.schema('cartel').from('requests').insert({
+                            await _supabase.schema('cartel').from('requests').insert({
                               'user_id': user.id,
                               'make': args['make'],
                               'model': args['model'],
@@ -670,7 +672,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                               const Icon(Icons.favorite_rounded, size: 20),
                             const SizedBox(width: 12),
                             Text(
-                              ts.translate('interested').toUpperCase(),
+                              ts.translate('interested'),
                               style: GoogleFonts.montserrat(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,
@@ -685,7 +687,14 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                       width: double.infinity,
                       child: TextButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/create-request');
+                          Navigator.pushNamed(
+                            context,
+                            '/create-request',
+                            arguments: {
+                              ...args,
+                              'from_car_detail': true,
+                            },
+                          );
                         },
                         style: TextButton.styleFrom(
                           backgroundColor: primaryColor,
@@ -702,7 +711,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                             const Icon(Icons.search_rounded, size: 20),
                             const SizedBox(width: 12),
                             Text(
-                              ts.translate('start_sourcing').toUpperCase(),
+                              ts.translate('start_sourcing'),
                               style: GoogleFonts.montserrat(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,

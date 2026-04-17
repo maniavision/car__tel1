@@ -76,7 +76,7 @@ class _CarDealsPageState extends State<CarDealsPage> {
               ),
             ),
             title: Text(
-              ts.translate('hot_deals').toUpperCase(),
+              ts.translate('hot_deals'),
               style: GoogleFonts.montserrat(
                 color: Colors.white,
                 fontSize: 16,
@@ -122,7 +122,7 @@ class _CarDealsPageState extends State<CarDealsPage> {
                           title: '${car['make']} ${car['model']}',
                           price: ts.formatPrice(finalPrice),
                           oldPrice: ts.formatPrice(oldPrice),
-                          distance: '${car['mileage'] ?? 0} ${ts.translate('kilometers').toUpperCase()}',
+                          distance: '${car['mileage'] ?? 0} ${ts.translate('kilometers')}',
                           year: year,
                           images: images,
                           primaryColor: primaryColor,
@@ -277,7 +277,7 @@ class _CarDealGridCardState extends State<CarDealGridCard> {
                         border: Border.all(color: Colors.white.withOpacity(0.1)),
                       ),
                       child: Text(
-                        widget.year.toUpperCase(),
+                        widget.year,
                         style: GoogleFonts.dmSans(
                           color: widget.primaryColor,
                           fontSize: 10,

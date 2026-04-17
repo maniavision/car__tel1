@@ -6,13 +6,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:car/models/request_status.dart';
 
 class RequestsPage extends StatefulWidget {
-  const RequestsPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const RequestsPage({super.key, this.supabaseClient});
 
   @override
   State<RequestsPage> createState() => _RequestsPageState();
 }
 
 class _RequestsPageState extends State<RequestsPage> {
+  late final SupabaseClient _supabase;
   final ts = TranslationService();
   String? selectedFilter;
   List<Map<String, dynamic>> _requests = [];
@@ -21,16 +23,17 @@ class _RequestsPageState extends State<RequestsPage> {
   @override
   void initState() {
     super.initState();
+    _supabase = widget.supabaseClient ?? Supabase.instance.client;
     _fetchRequests();
   }
 
   Future<void> _fetchRequests() async {
     setState(() => _isLoading = true);
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) return;
 
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('requests')
           .select('*, agents(name, avatar_url)')
@@ -55,13 +58,13 @@ class _RequestsPageState extends State<RequestsPage> {
 
   Future<void> _deleteRequest(dynamic requestId) async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) return;
 
       debugPrint('Tentative de suppression de la demande ID: $requestId (type: ${requestId.runtimeType}) pour l\'utilisateur: ${user.id}');
       
       // Tentative 1: ID tel quel
-      var response = await Supabase.instance.client
+      var response = await _supabase
           .schema('cartel')
           .from('requests')
           .delete()
@@ -74,7 +77,7 @@ class _RequestsPageState extends State<RequestsPage> {
         final intId = int.tryParse(requestId.toString());
         if (intId != null && intId.toString() != requestId.toString()) {
           debugPrint('Nouvelle tentative avec ID entier: $intId');
-          response = await Supabase.instance.client
+          response = await _supabase
               .schema('cartel')
               .from('requests')
               .delete()
@@ -91,7 +94,7 @@ class _RequestsPageState extends State<RequestsPage> {
            // already tried in Attempt 1 if it was string
         } else {
           debugPrint('Nouvelle tentative avec ID stringifié: $stringId');
-          response = await Supabase.instance.client
+          response = await _supabase
               .schema('cartel')
               .from('requests')
               .delete()
@@ -163,6 +166,7 @@ class _RequestsPageState extends State<RequestsPage> {
           ts.translate('toutes'),
           ts.translate('initialisee'),
           ts.translate('en_cours'),
+          ts.translate('trouve'),
           ts.translate('terminee')
         ];
         
@@ -207,6 +211,22 @@ class _RequestsPageState extends State<RequestsPage> {
                                 final isUnassigned = request['agent_id'] == null;
                                 final canEditOrDelete = requestStatus == RequestStatus.initiated && isUnassigned;
                                 
+                                IconData statusIcon;
+                                switch (requestStatus) {
+                                  case RequestStatus.initiated:
+                                    statusIcon = Icons.note_add_rounded;
+                                    break;
+                                  case RequestStatus.inProgress:
+                                    statusIcon = Icons.manage_search_rounded;
+                                    break;
+                                  case RequestStatus.found:
+                                    statusIcon = Icons.auto_awesome_rounded;
+                                    break;
+                                  case RequestStatus.complete:
+                                    statusIcon = Icons.check_circle_rounded;
+                                    break;
+                                }
+
                                 String dateStr = '';
                                 try {
                                   final createdAt = DateTime.parse(request['created_at']);
@@ -290,7 +310,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                     agent: agentName,
                                     paymentStatus: request['payment_status'] ?? 'Confirmé',
                                     step: status == 'initialisée' || status == 'initialisee' ? ts.translate('attente_assignation_agent') : ts.translate('identification_vehicules'),
-                                    icon: isFinished ? Icons.verified_user_rounded : (isPulse ? Icons.directions_car_rounded : Icons.receipt_long_rounded),
+                                    icon: statusIcon,
                                     primaryColor: primaryColor,
                                     borderColor: borderColor,
                                     mutedForeground: mutedForeground,
@@ -353,6 +373,9 @@ class _RequestsPageState extends State<RequestsPage> {
       if (translatedFilter == ts.translate('en_cours').toLowerCase()) {
         return requestStatus == RequestStatus.inProgress;
       }
+      if (translatedFilter == ts.translate('trouve').toLowerCase()) {
+        return requestStatus == RequestStatus.found;
+      }
       if (translatedFilter == ts.translate('terminee').toLowerCase()) {
         return requestStatus == RequestStatus.complete;
       }
@@ -396,7 +419,7 @@ class _RequestsPageState extends State<RequestsPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '$activeCount ${ts.translate('actives').toUpperCase()}',
+                      '$activeCount ${ts.translate('actives')}',
                       style: GoogleFonts.plusJakartaSans(
                         color: primaryColor,
                         fontSize: 10,
@@ -472,13 +495,13 @@ class _RequestsPageState extends State<RequestsPage> {
     Color getStatusColor() {
       switch (requestStatus) {
         case RequestStatus.initiated:
-          return Colors.orangeAccent;
+          return const Color(0xFFA3A3A3);
         case RequestStatus.inProgress:
-          return Colors.blueAccent;
+          return primaryColor;
         case RequestStatus.found:
-          return Colors.greenAccent;
+          return const Color(0xFF60A5FA);
         case RequestStatus.complete:
-          return const Color(0xFF525252); // Dark grey for Complete
+          return const Color(0xFF10B981);
         default:
           return mutedForeground;
       }
@@ -494,7 +517,7 @@ class _RequestsPageState extends State<RequestsPage> {
         decoration: BoxDecoration(
           color: isFinished ? const Color(0xFF1F1F1F).withOpacity(0.8) : const Color(0xFF141414).withOpacity(0.4),
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: isFinished ? const Color(0xFF525252).withOpacity(0.3) : (isPulse ? primaryColor.withOpacity(0.4) : borderColor.withOpacity(0.6))),
+          border: Border.all(color: statusBorderColor),
         ),
         child: Column(
           children: [
@@ -512,13 +535,13 @@ class _RequestsPageState extends State<RequestsPage> {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: isFinished ? Colors.green.withOpacity(0.1) : (isPulse ? primaryColor.withOpacity(0.1) : const Color(0xFF1F1F1F)),
+                                color: statusBgColor,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: isFinished ? Colors.green.withOpacity(0.2) : (isPulse ? primaryColor.withOpacity(0.2) : borderColor.withOpacity(0.5))),
+                                border: Border.all(color: statusBorderColor),
                               ),
                               child: Icon(
-                                isFinished ? Icons.verified_user_rounded : (isPulse ? Icons.directions_car_rounded : icon),
-                                color: isFinished ? Colors.green : (isPulse ? primaryColor : mutedForeground),
+                                icon,
+                                color: statusColorFinal,
                                 size: 24,
                               ),
                             ),
@@ -565,7 +588,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                   border: Border.all(color: statusBorderColor),
                                 ),
                                 child: Text(
-                                  status.toUpperCase(),
+                                  status,
                                   style: GoogleFonts.plusJakartaSans(
                                     color: statusColorFinal,
                                     fontSize: 9,
@@ -600,7 +623,7 @@ class _RequestsPageState extends State<RequestsPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                ts.translate('budget_max').toUpperCase(),
+                                ts.translate('budget_max'),
                                 style: GoogleFonts.plusJakartaSans(
                                   color: mutedForeground,
                                   fontSize: 9,
@@ -625,7 +648,7 @@ class _RequestsPageState extends State<RequestsPage> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                isFinished ? ts.translate('statut').toUpperCase() : (isPulse ? ts.translate('agent').toUpperCase() : ts.translate('paiement').toUpperCase()),
+                                isFinished ? ts.translate('statut') : (isPulse ? ts.translate('agent') : ts.translate('paiement')),
                                 style: GoogleFonts.plusJakartaSans(
                                   color: mutedForeground,
                                   fontSize: 9,
@@ -677,7 +700,7 @@ class _RequestsPageState extends State<RequestsPage> {
                   const SizedBox(height: 16),
                   if (isFinished)
                     _buildPrimaryButton(
-                      label: ts.translate('leave_review').toUpperCase(),
+                      label: ts.translate('leave_review'),
                       icon: Icons.star_rounded,
                       onTap: () => Navigator.pushNamed(context, '/leave-review', arguments: request),
                     )
@@ -780,7 +803,7 @@ class _RequestsPageState extends State<RequestsPage> {
           border: Border.all(color: const Color(0xFF2A2A2A)),
         ),
         child: Text(
-          label.toUpperCase(),
+          label,
           textAlign: TextAlign.center,
           style: GoogleFonts.plusJakartaSans(
             color: Colors.white,

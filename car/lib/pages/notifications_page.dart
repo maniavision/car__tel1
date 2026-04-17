@@ -177,7 +177,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   Icon(Icons.done_all_rounded, color: primaryColor, size: 16),
                   const SizedBox(width: 8),
                   Text(
-                    ts.translate('mark_all_read').toUpperCase(),
+                    ts.translate('mark_all_read'),
                     style: GoogleFonts.dmSans(
                       color: primaryColor,
                       fontSize: 10,

@@ -206,7 +206,7 @@ class _PaymentFailedPageState extends State<PaymentFailedPage> with SingleTicker
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                ts.translate('statut').toUpperCase(),
+                ts.translate('statut'),
                 style: GoogleFonts.dmSans(
                   color: mutedForeground,
                   fontSize: 10,
@@ -253,7 +253,7 @@ class _PaymentFailedPageState extends State<PaymentFailedPage> with SingleTicker
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          label.toUpperCase(),
+          label,
           style: GoogleFonts.dmSans(
             color: mutedForeground,
             fontSize: 10,

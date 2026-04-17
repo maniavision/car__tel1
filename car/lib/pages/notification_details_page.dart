@@ -74,7 +74,7 @@ class NotificationDetailsPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              ts.translate(notification.type.toLowerCase()).toUpperCase(),
+                              ts.translate(notification.type.toLowerCase()),
                               style: GoogleFonts.dmSans(
                                 color: primaryColor,
                                 fontSize: 10,
@@ -135,7 +135,7 @@ class NotificationDetailsPage extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    ts.translate('voir_tout').toUpperCase(),
+                    ts.translate('voir_tout'),
                     style: GoogleFonts.dmSans(
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.0,

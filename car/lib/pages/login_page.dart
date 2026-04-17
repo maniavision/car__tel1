@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
@@ -7,13 +8,15 @@ import 'package:car/services/stripe_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const LoginPage({super.key, this.supabaseClient});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
+  SupabaseClient get _supabase => widget.supabaseClient ?? Supabase.instance.client;
   bool _obscurePassword = true;
   bool _isLoading = false;
   final _emailController = TextEditingController();
@@ -23,7 +26,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await Supabase.instance.client.auth.signInWithPassword(
+      final response = await _supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
@@ -56,8 +59,74 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  StreamSubscription<AuthState>? _authSubscription;
+
+  Future<void> _handleSocialLogin(OAuthProvider provider) async {
+    setState(() => _isLoading = true);
+    try {
+      await _supabase.auth.signInWithOAuth(
+        provider,
+        redirectTo: 'cartel://login-callback',
+      );
+    } catch (e) {
+      if (mounted) {
+        final message = e is AuthException ? e.message : TranslationService().translate('error_occurred');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    _authSubscription = _supabase.auth.onAuthStateChange.listen((data) async {
+      final AuthChangeEvent event = data.event;
+      final Session? session = data.session;
+      
+      if (event == AuthChangeEvent.signedIn && session != null) {
+        // Check if profile exists, if not create basic one (important for social sign-in)
+        try {
+          final user = session.user;
+          final profile = await _supabase
+              .schema('cartel')
+              .from('profiles')
+              .select()
+              .eq('id', user.id)
+              .maybeSingle();
+
+          if (profile == null) {
+            await _supabase.schema('cartel').from('profiles').upsert({
+              'id': user.id,
+              'full_name': user.userMetadata?['full_name'] ?? user.email?.split('@')[0],
+              'email': user.email,
+              'avatar_url': user.userMetadata?['avatar_url'],
+              'type': 'Client',
+            });
+          }
+        } catch (e) {
+          debugPrint('Error ensuring profile exists: $e');
+        }
+
+        NotificationService().init();
+        StripeService().initialize();
+        await TranslationService().loadUserPreferences();
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -182,7 +251,7 @@ class _LoginPageState extends State<LoginPage> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: Text(
-                              ts.translate('forgot_password').toUpperCase(),
+                              ts.translate('forgot_password'),
                               style: GoogleFonts.dmSans(
                                 color: mutedForeground,
                                 fontSize: 10,
@@ -243,7 +312,7 @@ class _LoginPageState extends State<LoginPage> {
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Text(
-                              ts.translate('or_continue_with').toUpperCase(),
+                              ts.translate('or_continue_with'),
                               style: GoogleFonts.dmSans(
                                 color: mutedForeground,
                                 fontSize: 10,
@@ -261,21 +330,27 @@ class _LoginPageState extends State<LoginPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: _buildSocialButton(
-                              icon: 'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
-                              label: ts.translate('google'),
-                              borderColor: borderColor,
-                              cardColor: cardColor,
+                            child: GestureDetector(
+                              onTap: () => _handleSocialLogin(OAuthProvider.google),
+                              child: _buildSocialButton(
+                                icon: 'https://www.google.com/images/branding/googleg/1x/googleg_standard_color_128dp.png',
+                                label: ts.translate('google'),
+                                borderColor: borderColor,
+                                cardColor: cardColor,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildSocialButton(
-                              icon: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg',
-                              label: ts.translate('apple'),
-                              borderColor: borderColor,
-                              cardColor: cardColor,
-                              isApple: true,
+                            child: GestureDetector(
+                              onTap: () => _handleSocialLogin(OAuthProvider.apple),
+                              child: _buildSocialButton(
+                                icon: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg',
+                                label: ts.translate('apple'),
+                                borderColor: borderColor,
+                                cardColor: cardColor,
+                                isApple: true,
+                              ),
                             ),
                           ),
                         ],
@@ -336,7 +411,7 @@ class _LoginPageState extends State<LoginPage> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            label.toUpperCase(),
+            label,
             style: GoogleFonts.dmSans(
               color: primaryColor,
               fontSize: 10,

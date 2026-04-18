@@ -113,6 +113,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
   }
 
   Widget _buildContent(Map<String, dynamic> car, Color primaryColor, Color borderColor, Color mutedForeground, bool isMatch, List<String> images) {
+    debugPrint('Car Data Map: $car');
     final year = car['year']?.toString() ?? '2022';
     final make = car['make'] ?? car['name'] ?? 'Mercedes-Benz';
     final model = car['model'] ?? 'GLE 450';
@@ -121,6 +122,28 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
     final transmission = car['transmission'] ?? '9G-Tronic Auto';
     final exteriorColor = car['exterior_color'] ?? 'Silver Met.';
     final interiorColor = car['interior_color'] ?? 'Espresso Br.';
+    final fuelType = car['fuel_type'];
+    final bodyStyle = car['body_style'];
+    final driveTrain = car['drive_train'];
+    
+    dynamic featuresData = car['features'];
+    List<String> features = [];
+    if (featuresData is List) {
+      features = List<String>.from(featuresData.map((e) => e.toString()));
+    } else if (featuresData is String && featuresData.isNotEmpty) {
+      // Handle cases where it might be a comma-separated string or JSON string
+      if (featuresData.startsWith('[') && featuresData.endsWith(']')) {
+        // Simple manual parse if it looks like a list string
+        features = featuresData
+          .substring(1, featuresData.length - 1)
+          .split(',')
+          .map((e) => e.trim().replaceAll('"', '').replaceAll("'", ""))
+          .where((e) => e.isNotEmpty)
+          .toList();
+      } else {
+        features = featuresData.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    }
 
     final isDeal = car['is_deal'] == true;
 
@@ -208,6 +231,9 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
           _buildSpecRow(ts.translate('kilometrage'), '$mileage KM', Icons.speed_rounded, primaryColor, isHighlight: true),
           _buildSpecRow(ts.translate('moteur'), engine, Icons.gas_meter_rounded, primaryColor),
           _buildSpecRow(ts.translate('boite'), transmission, Icons.settings_rounded, primaryColor),
+          _buildSpecRow(ts.translate('énergie'), _translateFuelType(fuelType?.toString() ?? 'N/A'), Icons.ev_station_rounded, primaryColor),
+          _buildSpecRow(ts.translate('body_style'), _translateBodyStyle(bodyStyle?.toString() ?? 'N/A'), Icons.inventory_2_rounded, primaryColor),
+          _buildSpecRow(ts.translate('drive_train'), _translateDriveTrain(driveTrain?.toString() ?? 'N/A'), Icons.settings_input_component_rounded, primaryColor),
           
           const SizedBox(height: 12),
           Row(
@@ -216,6 +242,57 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
               const SizedBox(width: 12),
               Expanded(child: _buildColorSpec(ts.translate('cuir_int'), interiorColor, const Color(0xFF3D2B1F))),
             ],
+          ),
+          
+          const SizedBox(height: 48),
+          _buildSpecsHeader(ts.translate('equipements_inclus'), primaryColor),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(24),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(32),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: features.isEmpty 
+              ? Text(
+                  'Aucun équipement spécifié',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white38,
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                )
+              : Column(
+                  children: features.map((feature) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.check_rounded, color: primaryColor, size: 12),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            feature,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+                ),
           ),
         ],
       ),
@@ -733,6 +810,27 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
       useSafeArea: false,
       builder: (context) => _FullScreenImageViewer(images: images, initialIndex: initialIndex),
     );
+  }
+
+  String _translateFuelType(String value) {
+    if (value == 'N/A') return 'N/A';
+    final key = 'fuel_${value.toLowerCase()}';
+    final translated = ts.translate(key);
+    return translated != key ? translated : value;
+  }
+
+  String _translateBodyStyle(String value) {
+    if (value == 'N/A') return 'N/A';
+    final key = value.toLowerCase().replaceAll(' ', '_');
+    final translated = ts.translate(key);
+    return translated != key ? translated : value;
+  }
+
+  String _translateDriveTrain(String value) {
+    if (value == 'N/A') return 'N/A';
+    final key = value.toLowerCase().replaceAll(' ', '_');
+    final translated = ts.translate(key);
+    return translated != key ? translated : value;
   }
 }
 

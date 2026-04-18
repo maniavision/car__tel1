@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:car/models/request_status.dart';
 
 class RequestDetailsPage extends StatefulWidget {
   final SupabaseClient? supabaseClient;
@@ -46,7 +47,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
       final response = await _supabase
           .schema('cartel')
           .from('matches')
-          .select()
+          .select('*')
           .eq('request_id', requestId)
           .order('created_at', ascending: false);
 
@@ -204,9 +205,9 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     return ListenableBuilder(
       listenable: ts,
       builder: (context, _) {
-        final status = _request?['status']?.toString().toLowerCase() ?? 'initialisée';
-        final isFinished = status == 'terminee' || status == 'terminée' || status == 'complete';
-        final isFound = status == 'trouvé' || status == 'trouvée' || status == 'found';
+        final requestStatus = RequestStatusExtension.fromString(_request?['status']?.toString() ?? '');
+        final isFinished = requestStatus == RequestStatus.complete;
+        final isFound = requestStatus == RequestStatus.found;
 
         bool showProcessingView = !isFinished && !isFound;
 
@@ -907,8 +908,8 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     final agentData = request?['agents'];
     final agentId = request?['agent_id'];
     final agentAssigned = agentId != null;
-    final status = request?['status']?.toString().toLowerCase() ?? 'initialisée';
-    final isInProgress = status == 'en cours' || status == 'en_cours';
+    final requestStatus = RequestStatusExtension.fromString(request?['status']?.toString() ?? '');
+    final isInProgress = requestStatus == RequestStatus.inProgress;
 
     return Container(
       padding: const EdgeInsets.all(20),

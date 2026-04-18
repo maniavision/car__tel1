@@ -203,7 +203,6 @@ class _RequestsPageState extends State<RequestsPage> {
                                 itemBuilder: (context, index) {
                                 final request = _filteredRequests()[index];
                                 final requestStatus = RequestStatusExtension.fromString(request['status']?.toString() ?? '');
-                                final status = request['status']?.toString().toLowerCase() ?? 'initialisée';
                                 final isFinished = requestStatus == RequestStatus.complete;
                                 final isPulse = requestStatus == RequestStatus.inProgress;
                                 final agentData = request['agents'];
@@ -304,12 +303,12 @@ class _RequestsPageState extends State<RequestsPage> {
                                     request: request,
                                     title: '${request['make']} ${request['model']}',
                                     subtitle: dateStr,
-                                    status: ts.translate(status.replaceAll(' ', '_')),
+                                    status: ts.translate(requestStatus.translationKey),
                                     id: '#${request['id'].toString().substring(0, 4).toUpperCase()}',
                                     budget: ts.formatPrice((request['budget_max'] ?? 0).toDouble()),
                                     agent: agentName,
                                     paymentStatus: request['payment_status'] ?? 'Confirmé',
-                                    step: status == 'initialisée' || status == 'initialisee' ? ts.translate('attente_assignation_agent') : ts.translate('identification_vehicules'),
+                                    step: requestStatus == RequestStatus.initiated ? ts.translate('attente_assignation_agent') : ts.translate('identification_vehicules'),
                                     icon: statusIcon,
                                     primaryColor: primaryColor,
                                     borderColor: borderColor,

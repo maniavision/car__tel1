@@ -137,7 +137,7 @@ class _HomePageState extends State<HomePage> {
       final response = await _supabase
           .schema('cartel')
           .from('car_deal')
-          .select()
+          .select('*')
           .eq('status', 'Available')
           .order('created_at', ascending: true)
           .limit(15);
@@ -161,7 +161,7 @@ class _HomePageState extends State<HomePage> {
       final response = await _supabase
           .schema('cartel')
           .from('trending_cars')
-          .select()
+          .select('*')
           .order('created_at', ascending: true);
       
       if (mounted) {
@@ -453,6 +453,58 @@ class _HomePageState extends State<HomePage> {
                                         style: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
                                       ),
                                     ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Frais de Douane
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.redAccent.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.shield_rounded, color: Colors.redAccent, size: 20),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  ts.translate('customs_fees'),
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.redAccent,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  ts.translate('customs_fees_msg'),
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],

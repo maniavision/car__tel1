@@ -26,7 +26,7 @@ class _CarDealsPageState extends State<CarDealsPage> {
       final response = await Supabase.instance.client
           .schema('cartel')
           .from('car_deal')
-          .select()
+          .select('*')
           .eq('status', 'Available')
           .order('created_at', ascending: false);
       

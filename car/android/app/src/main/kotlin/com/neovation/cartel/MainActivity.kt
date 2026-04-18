@@ -1,4 +1,4 @@
-package com.example.car
+package com.neovation.cartel
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

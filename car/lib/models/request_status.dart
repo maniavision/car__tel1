@@ -6,6 +6,19 @@ enum RequestStatus {
 }
 
 extension RequestStatusExtension on RequestStatus {
+  String get translationKey {
+    switch (this) {
+      case RequestStatus.initiated:
+        return 'initialisee';
+      case RequestStatus.inProgress:
+        return 'en_cours';
+      case RequestStatus.found:
+        return 'trouve';
+      case RequestStatus.complete:
+        return 'terminee';
+    }
+  }
+
   String get dbValue {
     switch (this) {
       case RequestStatus.initiated:

@@ -27,7 +27,7 @@ class _TrendingCarsPageState extends State<TrendingCarsPage> {
       final response = await Supabase.instance.client
           .schema('cartel')
           .from('trending_cars')
-          .select();
+          .select('*');
       
       if (mounted) {
         setState(() {

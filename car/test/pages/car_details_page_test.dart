@@ -117,6 +117,60 @@ void main() {
     }, createHttpClient: (context) => createMockHttpClient());
   });
 
+  testWidgets('CarDetailsPage renders price_label for non-deal (trending) car', (WidgetTester tester) async {
+    final carArgs = {
+      'id': 'car-456',
+      'make': 'Mercedes',
+      'model': 'G63 AMG',
+      'final_price': 185000000,
+      'image_url': 'https://example.com/g63.png',
+      'is_match': false,
+      'is_deal': false,
+    };
+
+    await HttpOverrides.runZoned(() async {
+      await tester.pumpWidget(MaterialApp(
+        onGenerateRoute: (settings) {
+          return MaterialPageRoute(
+            settings: RouteSettings(arguments: carArgs),
+            builder: (_) => CarDetailsPage(supabaseClient: mockClient),
+          );
+        },
+      ));
+
+      await tester.pump();
+
+      verify(() => mockTS.translate('price_label')).called(greaterThanOrEqualTo(1));
+    }, createHttpClient: (context) => createMockHttpClient());
+  });
+
+  testWidgets('CarDetailsPage renders price_label for deal car', (WidgetTester tester) async {
+    final carArgs = {
+      'id': 'car-789',
+      'make': 'Toyota',
+      'model': 'Corolla',
+      'final_price': 18500000,
+      'image_url': 'https://example.com/car.png',
+      'is_match': false,
+      'is_deal': true,
+    };
+
+    await HttpOverrides.runZoned(() async {
+      await tester.pumpWidget(MaterialApp(
+        onGenerateRoute: (settings) {
+          return MaterialPageRoute(
+            settings: RouteSettings(arguments: carArgs),
+            builder: (_) => CarDetailsPage(supabaseClient: mockClient),
+          );
+        },
+      ));
+
+      await tester.pump();
+
+      verify(() => mockTS.translate('price_label')).called(greaterThanOrEqualTo(1));
+    }, createHttpClient: (context) => createMockHttpClient());
+  });
+
   testWidgets('Clicking Interested triggers insert', (WidgetTester tester) async {
     final carArgs = {
       'id': 'car-123',

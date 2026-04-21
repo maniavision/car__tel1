@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:car/models/notification_model.dart';
 
-class NotificationService extends ChangeNotifier {
+class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
   static NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
-  NotificationService._internal();
+  NotificationService._internal() {
+    WidgetsBinding.instance.addObserver(this);
+    _listenToAuthState();
+  }
 
   @visibleForTesting
   static void setMockInstance(NotificationService mock) {
@@ -16,6 +21,31 @@ class NotificationService extends ChangeNotifier {
   List<NotificationModel> _notifications = [];
   bool _isLoading = false;
   RealtimeChannel? _channel;
+  StreamSubscription<AuthState>? _authSubscription;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _supabase.auth.currentUser != null) {
+      fetchNotifications();
+      _subscribeToNotifications();
+    }
+  }
+
+  void _listenToAuthState() {
+    if (_supabase.auth.currentUser != null) {
+      init();
+    }
+    _authSubscription = _supabase.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn ||
+          data.event == AuthChangeEvent.tokenRefreshed) {
+        init();
+      } else if (data.event == AuthChangeEvent.signedOut) {
+        logout();
+      }
+    });
+  }
 
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -77,6 +107,7 @@ class NotificationService extends ChangeNotifier {
           callback: (payload) {
             if (payload.eventType == PostgresChangeEvent.insert) {
               _notifications.insert(0, NotificationModel.fromJson(payload.newRecord));
+              _audioPlayer.play(AssetSource('sounds/notification.mp3'));
             } else if (payload.eventType == PostgresChangeEvent.update) {
               final updated = NotificationModel.fromJson(payload.newRecord);
               final index = _notifications.indexWhere((n) => n.id == updated.id);
@@ -208,7 +239,10 @@ class NotificationService extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _authSubscription?.cancel();
     _channel?.unsubscribe();
+    _audioPlayer.dispose();
     super.dispose();
   }
 }

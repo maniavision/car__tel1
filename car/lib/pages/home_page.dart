@@ -656,6 +656,7 @@ class _HomePageState extends State<HomePage> {
                                     primaryColor,
                                     cardColor,
                                     borderColor,
+                                    ts,
                                   );
                                 },
                               ),
@@ -1090,12 +1091,14 @@ class _HomePageState extends State<HomePage> {
     Color primaryColor,
     Color cardColor,
     Color borderColor,
+    TranslationService ts,
   ) {
     return GestureDetector(
       onTap: () {
         Navigator.pushNamed(context, '/car-details', arguments: {
           ...car,
           'is_match': false,
+          'condition': 'New',
         });
       },
       child: Container(
@@ -1176,14 +1179,29 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Flexible(
-                        child: Text(
-                          price,
-                          style: GoogleFonts.dmSans(
-                            color: primaryColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              ts.translate('starting_from').toUpperCase(),
+                              style: GoogleFonts.dmSans(
+                                color: const Color(0xFF888888),
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              price,
+                              style: GoogleFonts.montserrat(
+                                color: primaryColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),

@@ -127,6 +127,19 @@ void main() {
     ]);
   });
 
+  testWidgets('HomePage renders starting_from label in trending cards', (WidgetTester tester) async {
+    await HttpOverrides.runZoned(() async {
+      await tester.pumpWidget(MaterialApp(
+        home: HomePage(supabaseClient: mockClient),
+      ));
+
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      verify(() => mockTS.translate('starting_from')).called(greaterThanOrEqualTo(1));
+    }, createHttpClient: (context) => createMockHttpClient());
+  });
+
   testWidgets('HomePage renders sections', (WidgetTester tester) async {
     await HttpOverrides.runZoned(() async {
       await tester.pumpWidget(MaterialApp(

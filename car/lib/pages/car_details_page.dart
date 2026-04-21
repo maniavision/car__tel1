@@ -207,7 +207,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                       ),
                     ),
                     Text(
-                      ts.translate('prix_exportation'),
+                      ts.translate('price_label'),
                       style: GoogleFonts.plusJakartaSans(
                         color: mutedForeground,
                         fontSize: 9,

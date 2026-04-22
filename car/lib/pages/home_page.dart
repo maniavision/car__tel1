@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:car/widgets/bottom_nav.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:car/services/notification_service.dart';
@@ -326,7 +327,12 @@ class _HomePageState extends State<HomePage> {
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(20),
                                   child: (_profileData?['avatar_url'] ?? user?.userMetadata?['avatar_url']) != null
-                                      ? Image.network(_profileData?['avatar_url'] ?? user!.userMetadata!['avatar_url'], fit: BoxFit.cover)
+                                      ? CachedNetworkImage(
+                                          imageUrl: _profileData?['avatar_url'] ?? user!.userMetadata!['avatar_url'] as String,
+                                          fit: BoxFit.cover,
+                                          placeholder: (context, url) => Center(child: CircularProgressIndicator(color: primaryColor)),
+                                          errorWidget: (context, url, error) => Icon(Icons.person_rounded, color: primaryColor.withOpacity(0.5), size: 24),
+                                        )
                                       : Icon(Icons.person_rounded, color: primaryColor.withOpacity(0.5), size: 24),
                                 ),
                               ),
@@ -352,12 +358,22 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(32),
-                            child: Image.network(
-                              'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/XSw5ckPj4Vj/components/M1cNogNa5tI.png',
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                              opacity: const AlwaysStoppedAnimation(0.6),
+                            child: Opacity(
+                              opacity: 0.6,
+                              child: CachedNetworkImage(
+                                imageUrl: 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/XSw5ckPj4Vj/components/M1cNogNa5tI.png',
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  color: const Color(0xFF1F1F1F),
+                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: const Color(0xFF1F1F1F),
+                                  child: const Center(child: Icon(Icons.image_rounded, color: Colors.white24, size: 40)),
+                                ),
+                              ),
                             ),
                           ),
                           Container(
@@ -794,12 +810,16 @@ class _HomePageState extends State<HomePage> {
                         child: Stack(
                           children: [
                             if (t['image_url'] != null)
-                              Image.network(
-                                t['image_url'],
+                              CachedNetworkImage(
+                                imageUrl: t['image_url'],
                                 width: double.infinity,
                                 height: double.infinity,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
+                                placeholder: (context, url) => Container(
+                                  color: const Color(0xFF1F1F1F),
+                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                ),
+                                errorWidget: (context, url, error) => Container(
                                   color: const Color(0xFF1F1F1F),
                                   child: const Center(child: Icon(Icons.image_rounded, color: Colors.white24, size: 40)),
                                 ),
@@ -954,11 +974,21 @@ class _HomePageState extends State<HomePage> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
-                  child: Image.network(
-                    imageUrl,
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
                     height: 160,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      height: 160,
+                      color: const Color(0xFF1F1F1F),
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      height: 160,
+                      color: const Color(0xFF1F1F1F),
+                      child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white24, size: 40)),
+                    ),
                   ),
                 ),
                 Positioned(
@@ -1115,20 +1145,17 @@ class _HomePageState extends State<HomePage> {
               children: [
                 ClipRRect(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                  child: Image.network(
-                    imageUrl,
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
                     height: 160,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Container(
-                        height: 160,
-                        color: const Color(0xFF1F1F1F),
-                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => Container(
+                    placeholder: (context, url) => Container(
+                      height: 160,
+                      color: const Color(0xFF1F1F1F),
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       height: 160,
                       color: const Color(0xFF1F1F1F),
                       child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white24, size: 40)),

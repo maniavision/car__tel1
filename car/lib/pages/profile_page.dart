@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:car/widgets/bottom_nav.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:car/services/notification_service.dart';
@@ -282,10 +283,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: _isUploading
                         ? Center(child: CircularProgressIndicator(color: primaryColor))
                         : avatarUrl != null
-                            ? Image.network(
-                                avatarUrl,
+                            ? CachedNetworkImage(
+                                imageUrl: avatarUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
+                                placeholder: (context, url) => Center(child: CircularProgressIndicator(color: primaryColor)),
+                                errorWidget: (context, url, error) => Container(
                                   color: secondaryColor,
                                   child: Icon(Icons.person_rounded, color: primaryColor.withOpacity(0.5), size: 48),
                                 ),

@@ -481,7 +481,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         if (request?['agent_id'] != null) ...[
           _buildSectionTitle(ts.translate('agent_responsable'), mutedForeground),
           const SizedBox(height: 16),
-          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request),
+          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request, isInProgress: true),
         ],
 
         const SizedBox(height: 32),
@@ -655,7 +655,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         if (request?['agent_id'] != null) ...[
           _buildSectionTitle(ts.translate('agent_responsable'), mutedForeground),
           const SizedBox(height: 16),
-          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request),
+          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request, isInProgress: false),
         ],
         const SizedBox(height: 40),
       ],
@@ -1105,7 +1105,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     );
   }
 
-  Widget _buildAgentCard(BuildContext context, Color primaryColor, Color cardColor, Color borderColor, Color mutedForeground, TranslationService ts, Map<String, dynamic>? request) {
+  Widget _buildAgentCard(BuildContext context, Color primaryColor, Color cardColor, Color borderColor, Color mutedForeground, TranslationService ts, Map<String, dynamic>? request, {bool isInProgress = false}) {
     final agentData = request?['agents'];
     final agentName = agentData?['name'] ?? 'Agent CarTel';
     final agentPhotoUrl = agentData?['avatar_url'];
@@ -1210,7 +1210,6 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                   ),
               ],
             ),
-          ),
         ],
       ),
     );

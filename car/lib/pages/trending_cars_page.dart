@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:car/services/translation_service.dart';
 
 class TrendingCarsPage extends StatefulWidget {
@@ -294,17 +295,14 @@ class _TrendingCarCardState extends State<TrendingCarCard> {
                             },
                             itemCount: widget.imageUrls.length,
                             itemBuilder: (context, index) {
-                              return Image.network(
-                                widget.imageUrls[index],
+                              return CachedNetworkImage(
+                                imageUrl: widget.imageUrls[index],
                                 fit: BoxFit.cover,
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return Container(
-                                    color: const Color(0xFF1F1F1F),
-                                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                  );
-                                },
-                                errorBuilder: (context, error, stackTrace) => Container(
+                                placeholder: (context, url) => Container(
+                                  color: const Color(0xFF1F1F1F),
+                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                ),
+                                errorWidget: (context, url, error) => Container(
                                   color: const Color(0xFF1F1F1F),
                                   child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white24, size: 40)),
                                 ),

@@ -393,7 +393,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         if (request?['agent_id'] != null) ...[
           _buildSectionTitle(ts.translate('agent_responsable'), mutedForeground),
           const SizedBox(height: 16),
-          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request),
+          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request, isInProgress: true),
         ],
 
         const SizedBox(height: 32),
@@ -567,7 +567,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         if (request?['agent_id'] != null) ...[
           _buildSectionTitle(ts.translate('agent_responsable'), mutedForeground),
           const SizedBox(height: 16),
-          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request),
+          _buildAgentCard(context, primaryColor, cardColor, borderColor, mutedForeground, ts, request, isInProgress: false),
         ],
         const SizedBox(height: 40),
       ],
@@ -1017,7 +1017,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     );
   }
 
-  Widget _buildAgentCard(BuildContext context, Color primaryColor, Color cardColor, Color borderColor, Color mutedForeground, TranslationService ts, Map<String, dynamic>? request) {
+  Widget _buildAgentCard(BuildContext context, Color primaryColor, Color cardColor, Color borderColor, Color mutedForeground, TranslationService ts, Map<String, dynamic>? request, {bool isInProgress = false}) {
     final agentData = request?['agents'];
     final agentName = agentData?['name'] ?? 'Agent CarTel';
     final agentPhotoUrl = agentData?['avatar_url'];
@@ -1077,21 +1077,22 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
               ],
             ),
           ),
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: primaryColor,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
-                ],
+          if (!isInProgress)
+            GestureDetector(
+              onTap: () {},
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.black, size: 18),
               ),
-              child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.black, size: 18),
             ),
-          ),
         ],
       ),
     );

@@ -689,6 +689,7 @@ class TranslationService extends ChangeNotifier {
       'body_style': 'Silhouette',
       'drive_train': 'Transmission',
       'features': 'Équipements',
+      'equipements_inclus': 'Équipements inclus',
     },
   };
 

@@ -22,9 +22,13 @@ class _ChatPageState extends State<ChatPage> {
   List<Map<String, dynamic>> _messages = [];
   Map<String, dynamic>? _request;
   Map<String, dynamic>? _agent;
+  String? _conversationId;
   bool _isLoading = true;
   bool _isSending = false;
+  bool _isAgentTyping = false;
   RealtimeChannel? _channel;
+  Timer? _typingTimer;
+  Timer? _myTypingDebounce;
   bool _initialized = false;
 
   static const _primaryColor = Color(0xFFD4AF37);
@@ -52,8 +56,11 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _loadData() async {
     _loadAgentFromRequest();
-    await _fetchMessages();
-    _subscribeToMessages();
+    await _ensureConversation();
+    if (_conversationId != null) {
+      await _fetchMessages();
+      _subscribeToMessages();
+    }
     if (mounted) setState(() => _isLoading = false);
     _scrollToBottom();
   }
@@ -61,78 +68,233 @@ class _ChatPageState extends State<ChatPage> {
   void _loadAgentFromRequest() {
     final agentData = _request?['agents'];
     if (agentData != null) {
-      setState(() => _agent = {
-        'full_name': agentData['name'] ?? agentData['full_name'] ?? '',
-        'avatar_url': agentData['avatar_url'],
-        'specialty': agentData['specialty'],
-      });
+      if (mounted) {
+        setState(() => _agent = {
+          'full_name': agentData['name'] ?? agentData['full_name'] ?? '',
+          'avatar_url': agentData['avatar_url'],
+          'specialty': agentData['specialty'],
+        });
+      }
+    }
+  }
+
+  Future<void> _ensureConversation() async {
+    final requestId = _request?['id'];
+    if (requestId == null) return;
+
+    try {
+      final existing = await _supabase
+          .schema('cartel')
+          .from('conversations')
+          .select('id')
+          .eq('request_id', requestId)
+          .maybeSingle();
+
+      if (existing != null) {
+        _conversationId = existing['id'] as String;
+        return;
+      }
+
+      final userId = _supabase.auth.currentUser?.id;
+      final agentId = _request?['agent_id'];
+      if (userId == null || agentId == null) return;
+
+      final created = await _supabase
+          .schema('cartel')
+          .from('conversations')
+          .insert({
+            'request_id': requestId,
+            'client_id': userId,
+            'agent_id': agentId,
+          })
+          .select('id')
+          .single();
+
+      _conversationId = created['id'] as String;
+    } catch (e) {
+      debugPrint('Error ensuring conversation: $e');
     }
   }
 
   Future<void> _fetchMessages() async {
-    final requestId = _request?['id'];
-    if (requestId == null) return;
+    final convId = _conversationId;
+    if (convId == null) return;
     try {
       final response = await _supabase
           .schema('cartel')
           .from('messages')
           .select()
-          .eq('request_id', requestId)
+          .eq('conversation_id', convId)
           .order('created_at', ascending: true);
       if (mounted) {
         setState(() => _messages = List<Map<String, dynamic>>.from(response));
       }
+      await _markAgentMessagesAsRead();
     } catch (e) {
       debugPrint('Error fetching messages: $e');
     }
   }
 
+  Future<void> _markAgentMessagesAsRead() async {
+    final convId = _conversationId;
+    if (convId == null) return;
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final updated = await _supabase
+          .schema('cartel')
+          .from('messages')
+          .update({'read_at': now})
+          .eq('conversation_id', convId)
+          .inFilter('sender_role', ['Agent', 'Admin'])
+          .isFilter('read_at', null)
+          .select('id');
+      if (mounted && (updated as List).isNotEmpty) {
+        setState(() {
+          for (final u in updated) {
+            final id = u['id'] as String?;
+            if (id == null) continue;
+            final idx = _messages.indexWhere((m) => m['id'] == id);
+            if (idx != -1) _messages[idx] = {..._messages[idx], 'read_at': now};
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error marking messages as read: $e');
+    }
+  }
+
   void _subscribeToMessages() {
-    final requestId = _request?['id'];
-    if (requestId == null) return;
+    final convId = _conversationId;
+    if (convId == null) return;
 
     _channel = _supabase
-        .channel('chat:$requestId')
+        .channel('chat:$convId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'cartel',
           table: 'messages',
           filter: PostgresChangeFilter(
             type: PostgresChangeFilterType.eq,
-            column: 'request_id',
-            value: requestId,
+            column: 'conversation_id',
+            value: convId,
           ),
           callback: (payload) {
-            if (mounted) {
-              setState(() => _messages.add(payload.newRecord));
+            if (!mounted) return;
+            final incoming = payload.newRecord;
+            final id = incoming['id'] as String?;
+            final alreadyExists = id != null && _messages.any((m) => m['id'] == id);
+            if (!alreadyExists) {
+              setState(() => _messages.add(incoming));
               _scrollToBottom();
+              final role = incoming['sender_role'] as String?;
+              if (role == 'Agent' || role == 'Admin') {
+                _markAgentMessagesAsRead();
+              }
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'cartel',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: convId,
+          ),
+          callback: (payload) {
+            if (!mounted) return;
+            final updated = payload.newRecord;
+            final id = updated['id'] as String?;
+            if (id == null) return;
+            setState(() {
+              final idx = _messages.indexWhere((m) => m['id'] == id);
+              if (idx != -1) _messages[idx] = {..._messages[idx], ...updated};
+            });
+          },
+        )
+        .onBroadcast(
+          event: 'typing',
+          callback: (payload) {
+            if (!mounted) return;
+            final role = payload['role'] as String?;
+            if (role == 'Agent' || role == 'Admin') {
+              _typingTimer?.cancel();
+              setState(() => _isAgentTyping = true);
+              _scrollToBottom();
+              _typingTimer = Timer(const Duration(seconds: 3), () {
+                if (mounted) setState(() => _isAgentTyping = false);
+              });
             }
           },
         )
         .subscribe();
   }
 
+  void _onTextChanged(String value) {
+    _myTypingDebounce?.cancel();
+    if (value.trim().isEmpty || _conversationId == null) return;
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    _channel?.sendBroadcastMessage(
+      event: 'typing',
+      payload: {'role': 'Client', 'sender_id': userId},
+    );
+    _myTypingDebounce = Timer(const Duration(milliseconds: 2000), () {});
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _isSending) return;
 
+    final convId = _conversationId;
     final userId = _supabase.auth.currentUser?.id;
-    final requestId = _request?['id'];
-    if (userId == null || requestId == null) return;
+    if (convId == null || userId == null) return;
 
     _controller.clear();
-    setState(() => _isSending = true);
+
+    final optimisticId = 'optimistic_${DateTime.now().millisecondsSinceEpoch}';
+    final optimisticMsg = {
+      'id': optimisticId,
+      'conversation_id': convId,
+      'sender_id': userId,
+      'sender_role': 'Client',
+      'content': text,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'read_at': null,
+    };
+
+    setState(() {
+      _messages.add(optimisticMsg);
+      _isSending = true;
+    });
+    _scrollToBottom();
 
     try {
-      await _supabase.schema('cartel').from('messages').insert({
-        'request_id': requestId,
-        'sender_id': userId,
-        'content': text,
-        'sender_role': 'user',
-      });
+      final inserted = await _supabase
+          .schema('cartel')
+          .from('messages')
+          .insert({
+            'conversation_id': convId,
+            'sender_id': userId,
+            'sender_role': 'Client',
+            'content': text,
+          })
+          .select()
+          .single();
+
+      if (mounted) {
+        setState(() {
+          final idx = _messages.indexWhere((m) => m['id'] == optimisticId);
+          if (idx != -1) _messages[idx] = inserted;
+        });
+      }
     } catch (e) {
       debugPrint('Error sending message: $e');
-      if (mounted) _controller.text = text;
+      if (mounted) {
+        setState(() => _messages.removeWhere((m) => m['id'] == optimisticId));
+        _controller.text = text;
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -152,6 +314,8 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    _typingTimer?.cancel();
+    _myTypingDebounce?.cancel();
     _channel?.unsubscribe();
     _controller.dispose();
     _scrollController.dispose();
@@ -314,20 +478,52 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildMessageList() {
     final currentUserId = _supabase.auth.currentUser?.id;
     final grouped = _groupByDate(_messages);
+    final itemCount = grouped.length + (_isAgentTyping ? 1 : 0);
 
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      itemCount: grouped.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        if (index == grouped.length && _isAgentTyping) {
+          return _buildTypingIndicator();
+        }
         final item = grouped[index];
         if (item['type'] == 'date') {
           return _buildDateSeparator(item['label'] as String);
         }
         final msg = item['message'] as Map<String, dynamic>;
-        final isMe = msg['sender_id'] == currentUserId || msg['sender_role'] == 'user';
+        final isMe = msg['sender_id'] == currentUserId ||
+            msg['sender_role'] == 'Client';
         return _buildMessage(msg, isMe);
       },
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    final agentName = _agent?['full_name'] as String? ?? '';
+    final label = agentName.isNotEmpty
+        ? '$agentName ${ts.translate('typing')}'
+        : ts.translate('typing');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _TypingDots(),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: GoogleFonts.dmSans(
+              color: _mutedForeground,
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -387,6 +583,7 @@ class _ChatPageState extends State<ChatPage> {
     final imageUrl = msg['image_url'] as String?;
     final dt = DateTime.tryParse(msg['created_at'] ?? '')?.toLocal();
     final timeStr = dt != null ? DateFormat('hh:mm a').format(dt) : '';
+    final isRead = msg['read_at'] != null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -411,7 +608,11 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   if (isMe) ...[
                     const SizedBox(width: 4),
-                    const Icon(Icons.done_all_rounded, color: _primaryColor, size: 12),
+                    Icon(
+                      Icons.done_all_rounded,
+                      color: isRead ? _primaryColor : _mutedForeground,
+                      size: 12,
+                    ),
                   ],
                 ],
               ),
@@ -527,6 +728,7 @@ class _ChatPageState extends State<ChatPage> {
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
+              onChanged: _onTextChanged,
               onSubmitted: (_) => _sendMessage(),
               textInputAction: TextInputAction.send,
             ),
@@ -551,6 +753,73 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TypingDots extends StatefulWidget {
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141414).withValues(alpha: 0.6),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(18),
+          topRight: Radius.circular(18),
+          bottomRight: Radius.circular(18),
+          bottomLeft: Radius.circular(4),
+        ),
+        border: Border.all(color: const Color(0xFF2A2A2A).withValues(alpha: 0.4)),
+      ),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(3, (i) {
+              final offset = ((_controller.value * 3) - i).clamp(0.0, 1.0);
+              final bounce = offset < 0.5 ? offset * 2 : (1 - offset) * 2;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Transform.translate(
+                  offset: Offset(0, -4 * bounce),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFA3A3A3).withValues(alpha: 0.6 + 0.4 * bounce),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          );
+        },
       ),
     );
   }

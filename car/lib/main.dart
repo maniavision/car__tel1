@@ -19,6 +19,7 @@ import 'package:car/pages/car_deals_page.dart';
 import 'package:car/pages/signup_page.dart';
 import 'package:car/pages/login_page.dart';
 import 'package:car/pages/leave_review_page.dart';
+import 'package:car/pages/chat_page.dart';
 import 'package:car/services/translation_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -74,6 +75,7 @@ class MyApp extends StatelessWidget {
             '/signup': (context) => const SignUpPage(),
             '/login': (context) => const LoginPage(),
             '/leave-review': (context) => const LeaveReviewPage(),
+            '/chat': (context) => const ChatPage(),
           },
           onGenerateRoute: (settings) {
             final tabPages = <String, Widget>{

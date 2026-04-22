@@ -202,10 +202,10 @@ class _HomePageState extends State<HomePage> {
   void _performAutoScroll(ScrollController controller) {
     double maxScroll = controller.position.maxScrollExtent;
     double currentScroll = controller.position.pixels;
-    double nextScroll = currentScroll - 1.0;
+    double nextScroll = currentScroll + 1.0;
 
-    if (nextScroll <= 0) {
-      controller.jumpTo(maxScroll);
+    if (nextScroll >= maxScroll) {
+      controller.jumpTo(0);
     } else {
       controller.jumpTo(nextScroll);
     }

@@ -19,6 +19,9 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
   bool _isLoadingMatches = false;
   Map<String, dynamic>? _request;
   bool _initialized = false;
+  int _unreadCount = 0;
+  String? _conversationId;
+  RealtimeChannel? _unreadChannel;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
       _request = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (_request != null) {
         _fetchMatches();
+        _fetchUnreadCount();
       }
       _initialized = true;
     }
@@ -63,6 +67,84 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         setState(() => _isLoadingMatches = false);
       }
     }
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    final requestId = _request?['id'];
+    if (requestId == null) return;
+    try {
+      if (_conversationId == null) {
+        final conversation = await _supabase
+            .schema('cartel')
+            .from('conversations')
+            .select('id')
+            .eq('request_id', requestId)
+            .maybeSingle();
+        if (conversation == null) return;
+        _conversationId = conversation['id'] as String;
+        _subscribeToUnreadMessages(_conversationId!);
+      }
+      await _refreshUnreadCount();
+    } catch (e) {
+      debugPrint('Error fetching unread count: $e');
+    }
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    final convId = _conversationId;
+    if (convId == null) return;
+    try {
+      final response = await _supabase
+          .schema('cartel')
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', convId)
+          .inFilter('sender_role', ['Agent', 'Admin'])
+          .isFilter('read_at', null);
+      if (mounted) {
+        setState(() => _unreadCount = (response as List).length);
+      }
+    } catch (e) {
+      debugPrint('Error refreshing unread count: $e');
+    }
+  }
+
+  void _subscribeToUnreadMessages(String convId) {
+    _unreadChannel = _supabase
+        .channel('unread:$convId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'cartel',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: convId,
+          ),
+          callback: (payload) {
+            if (!mounted) return;
+            final msg = payload.newRecord;
+            final role = msg['sender_role'] as String?;
+            if ((role == 'Agent' || role == 'Admin') && msg['read_at'] == null) {
+              setState(() => _unreadCount++);
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'cartel',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: convId,
+          ),
+          callback: (payload) {
+            if (!mounted) return;
+            _refreshUnreadCount();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _handleAcceptMatch(Map<String, dynamic> match) async {
@@ -192,6 +274,12 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         );
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _unreadChannel?.unsubscribe();
+    super.dispose();
   }
 
   @override
@@ -1077,21 +1165,50 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
               ],
             ),
           ),
-          if (!isInProgress)
-            GestureDetector(
-              onTap: () {},
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: primaryColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
+          GestureDetector(
+            onTap: () {
+              Navigator.pushNamed(context, '/chat', arguments: _request).then((_) => _fetchUnreadCount());
+            },
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.black, size: 18),
                 ),
-                child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.black, size: 18),
-              ),
+                if (_unreadCount > 0)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF0A0A0A), width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                      child: Text(
+                        _unreadCount > 99 ? '99+' : _unreadCount.toString(),
+                        style: GoogleFonts.dmSans(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          height: 1,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
         ],
       ),

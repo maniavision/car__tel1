@@ -62,14 +62,10 @@ class MyApp extends StatelessWidget {
             '/': (context) => const SplashPage(),
             '/language': (context) => const LanguageSelectionPage(),
             '/currency': (context) => const CurrencySelectionPage(),
-            '/home': (context) => const HomePage(),
             '/create-request': (context) => const CreateRequestPage(),
-            '/notifications': (context) => const NotificationsPage(),
             '/payment': (context) => const PaymentPage(),
             '/payment-success': (context) => const PaymentSuccessPage(),
             '/payment-failed': (context) => const PaymentFailedPage(),
-            '/profile': (context) => const ProfilePage(),
-            '/requests': (context) => const RequestsPage(),
             '/request-details': (context) => const RequestDetailsPage(),
             '/car-details': (context) => const CarDetailsPage(),
             '/how-it-works': (context) => const HowItWorksPage(),
@@ -78,6 +74,23 @@ class MyApp extends StatelessWidget {
             '/signup': (context) => const SignUpPage(),
             '/login': (context) => const LoginPage(),
             '/leave-review': (context) => const LeaveReviewPage(),
+          },
+          onGenerateRoute: (settings) {
+            final tabPages = <String, Widget>{
+              '/home': const HomePage(),
+              '/requests': const RequestsPage(),
+              '/notifications': const NotificationsPage(),
+              '/profile': const ProfilePage(),
+            };
+            if (tabPages.containsKey(settings.name)) {
+              return PageRouteBuilder(
+                settings: settings,
+                pageBuilder: (_, __, ___) => tabPages[settings.name]!,
+                transitionDuration: Duration.zero,
+                reverseTransitionDuration: Duration.zero,
+              );
+            }
+            return null;
           },
         );
       },

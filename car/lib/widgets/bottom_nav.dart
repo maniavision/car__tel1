@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
 
+
 class CustomBottomNav extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;

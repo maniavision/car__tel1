@@ -23,6 +23,8 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   String selectedMake = 'brand';
   final _modelController = TextEditingController();
+  bool _makeError = false;
+  bool _modelError = false;
   String selectedYear = '2023 - 2026';
   String selectedMileage = '0 - 10,000';
   final _requirementsController = TextEditingController();
@@ -222,6 +224,18 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   Future<void> _handleSubmit() async {
     final ts = TranslationService();
+
+    final makeInvalid = selectedMake == 'brand';
+    final modelInvalid = _modelController.text.trim().isEmpty;
+
+    if (makeInvalid || modelInvalid) {
+      setState(() {
+        _makeError = makeInvalid;
+        _modelError = modelInvalid;
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
     
     try {
@@ -528,12 +542,22 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                 ts.translate('make'),
                 selectedMake == 'brand' ? ts.translate('brand') : selectedMake,
                 makes,
-                onChanged: (val) => setState(() => selectedMake = val!),
+                onChanged: (val) => setState(() {
+                  selectedMake = val!;
+                  _makeError = false;
+                }),
+                hasError: _makeError,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _buildTextField(ts.translate('model'), ts.translate('e_g_urus'), controller: _modelController),
+              child: _buildTextField(
+                ts.translate('model'),
+                ts.translate('e_g_urus'),
+                controller: _modelController,
+                hasError: _modelError,
+                onChanged: (_) => setState(() => _modelError = false),
+              ),
             ),
           ],
         ),
@@ -931,27 +955,32 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     );
   }
 
-  Widget _buildTextField(String label, String placeholder, {int maxLines = 1, TextEditingController? controller}) {
+  Widget _buildTextField(String label, String placeholder, {int maxLines = 1, TextEditingController? controller, bool hasError = false, ValueChanged<String>? onChanged}) {
+    final errorBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: Colors.red, width: 1.5),
+    );
     return Stack(
       children: [
         TextField(
           controller: controller,
           maxLines: maxLines,
+          onChanged: onChanged,
           style: GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: GoogleFonts.dmSans(color: Colors.white24, fontSize: 14),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
-            border: OutlineInputBorder(
+            fillColor: hasError ? Colors.red.withOpacity(0.08) : Colors.white.withOpacity(0.05),
+            border: hasError ? errorBorder : OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
             ),
-            enabledBorder: OutlineInputBorder(
+            enabledBorder: hasError ? errorBorder : OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
             ),
-            focusedBorder: OutlineInputBorder(
+            focusedBorder: hasError ? errorBorder : OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide(color: const Color(0xFFD4AF37).withOpacity(0.5)),
             ),
@@ -976,7 +1005,11 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   }
 
   Widget _buildDropdownField(String label, String value, List<String> items,
-      {IconData? icon, bool enabled = true, ValueChanged<String?>? onChanged, String Function(String)? itemLabelBuilder}) {
+      {IconData? icon, bool enabled = true, ValueChanged<String?>? onChanged, String Function(String)? itemLabelBuilder, bool hasError = false}) {
+    final errorBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: const BorderSide(color: Colors.red, width: 1.5),
+    );
     return Stack(
       children: [
         Opacity(
@@ -990,16 +1023,16 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
               style: GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(
+                fillColor: hasError ? Colors.red.withOpacity(0.08) : Colors.white.withOpacity(0.05),
+                border: hasError ? errorBorder : OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
                 ),
-                enabledBorder: OutlineInputBorder(
+                enabledBorder: hasError ? errorBorder : OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
                 ),
-                focusedBorder: OutlineInputBorder(
+                focusedBorder: hasError ? errorBorder : OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(color: const Color(0xFFD4AF37).withOpacity(0.5)),
                 ),

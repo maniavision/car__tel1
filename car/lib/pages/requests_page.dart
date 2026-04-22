@@ -124,12 +124,7 @@ class _RequestsPageState extends State<RequestsPage> {
         setState(() {
           _requests.removeWhere((r) => r['id'].toString() == requestId.toString());
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ts.translate('request_deleted')),
-            backgroundColor: Colors.green,
-          ),
-        );
+
       }
     } catch (e) {
       debugPrint('Exception lors de la suppression: $e');

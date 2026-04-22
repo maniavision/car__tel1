@@ -19,7 +19,9 @@ class NotificationDetailsPage extends StatelessWidget {
 
     final ts = TranslationService();
 
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: ts,
+      builder: (context, _) => Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -145,6 +147,7 @@ class NotificationDetailsPage extends StatelessWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }

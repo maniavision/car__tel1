@@ -1210,6 +1210,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                   ),
               ],
             ),
+          ),
         ],
       ),
     );

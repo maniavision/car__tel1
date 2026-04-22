@@ -6,6 +6,7 @@ import 'package:car/widgets/bottom_nav.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:car/services/notification_service.dart';
 import 'dart:async';
+import 'dart:convert';
 
 class HomePage extends StatefulWidget {
   final SupabaseClient? supabaseClient;
@@ -197,6 +198,24 @@ class _HomePageState extends State<HomePage> {
         _performAutoScroll(_hotDealsScrollController);
       }
     });
+  }
+
+  String _extractFirstUrl(dynamic raw) {
+    if (raw == null) return '';
+    if (raw is List) return raw.isNotEmpty ? raw[0].toString().trim() : '';
+    final s = raw.toString().trim();
+    if (s.startsWith('[')) {
+      try {
+        final list = jsonDecode(s) as List;
+        return list.isNotEmpty ? list[0].toString().trim() : '';
+      } catch (_) {}
+    }
+    if (s.startsWith('{') && s.endsWith('}')) {
+      final inner = s.substring(1, s.length - 1);
+      final parts = inner.split(',');
+      return parts.isNotEmpty ? parts[0].trim().replaceAll('"', '') : '';
+    }
+    return s;
   }
 
   void _performAutoScroll(ScrollController controller) {
@@ -647,14 +666,7 @@ class _HomePageState extends State<HomePage> {
                                 itemBuilder: (context, index) {
                                   final car = _trendingCars[index];
                                   
-                                  String imageUrl = '';
-                                  final rawImage = car['image_url'];
-                                  if (rawImage is List && rawImage.isNotEmpty) {
-                                    imageUrl = rawImage[0].toString();
-                                  } else {
-                                    imageUrl = rawImage?.toString() ?? '';
-                                  }
-
+                                  String imageUrl = _extractFirstUrl(car['image_url']);
                                   if (imageUrl.isEmpty) {
                                     imageUrl = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/components/CZTKBqqeLr7.png';
                                   }
@@ -742,12 +754,7 @@ class _HomePageState extends State<HomePage> {
                             itemBuilder: (context, index) {
                               final car = _hotDeals[index];
                               
-                              String imageUrl = '';
-                              final rawImages = car['image_urls'];
-                              if (rawImages is List && rawImages.isNotEmpty) {
-                                imageUrl = rawImages[0].toString();
-                              }
-                              
+                              String imageUrl = _extractFirstUrl(car['image_urls']);
                               if (imageUrl.isEmpty) {
                                 imageUrl = 'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/components/CZTKBqqeLr7.png';
                               }

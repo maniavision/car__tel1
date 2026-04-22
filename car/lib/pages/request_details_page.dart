@@ -1078,7 +1078,9 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
             ),
           ),
           GestureDetector(
-            onTap: () {},
+            onTap: () {
+              Navigator.pushNamed(context, '/chat', arguments: _request);
+            },
             child: Container(
               width: 40,
               height: 40,

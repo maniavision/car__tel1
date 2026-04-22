@@ -647,7 +647,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                                 .schema('cartel')
                                 .from('requests')
                                 .update({
-                                  'status': 'Complete',
+                                  'status': 'Completed',
                                 })
                                 .eq('id', requestId);
 

@@ -28,7 +28,7 @@ extension RequestStatusExtension on RequestStatus {
       case RequestStatus.found:
         return 'Found';
       case RequestStatus.complete:
-        return 'Complete';
+        return 'Completed';
     }
   }
 
@@ -48,6 +48,7 @@ extension RequestStatusExtension on RequestStatus {
       case 'trouvée':
         return RequestStatus.found;
       case 'complete':
+      case 'completed':
       case 'terminée':
       case 'terminee':
         return RequestStatus.complete;

@@ -284,7 +284,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         response = await _supabase
             .schema('cartel')
             .from('requests')
-            .insert(data)
+            .insert({...data, 'payment_status': 'Pending'})
             .select()
             .single();
       }

@@ -36,7 +36,7 @@ class _RequestsPageState extends State<RequestsPage> {
       final response = await _supabase
           .schema('cartel')
           .from('requests')
-          .select('*, agents(name, avatar_url)')
+          .select('*, agents(name, avatar_url), matches(*)')
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
 
@@ -203,8 +203,46 @@ class _RequestsPageState extends State<RequestsPage> {
                                 final agentData = request['agents'];
                                 final agentName = agentData?['name'] ?? ts.translate('unassigned');
                                 final isUnassigned = request['agent_id'] == null;
-                                final canEditOrDelete = requestStatus == RequestStatus.initiated && isUnassigned;
-                                
+                                final paymentStatusVal = request['payment_status']?.toString() ?? 'Pending';
+                                final canEditOrDelete = requestStatus == RequestStatus.initiated && isUnassigned && paymentStatusVal != 'Paid';
+
+                                // Compute lifecycle step description (stages 1–10)
+                                final List matches = request['matches'] is List ? request['matches'] as List : [];
+                                final String stepText;
+                                if (requestStatus == RequestStatus.complete) {
+                                  // Stage 10
+                                  stepText = ts.translate('livre');
+                                } else if (requestStatus == RequestStatus.found) {
+                                  final bool anyDelivered   = matches.any((c) => c['status'] == 'Delivered');
+                                  final bool anyInTransit   = matches.any((c) => c['status'] == 'In Transit');
+                                  final bool anyAcceptedPaid = matches.any((c) => c['status'] == 'Accepted' && c['payment_status'] == 'Paid');
+                                  final bool anyAccepted    = matches.any((c) => c['status'] == 'Accepted');
+                                  if (anyDelivered) {
+                                    stepText = ts.translate('delivered_step');        // Stage 9
+                                  } else if (anyInTransit) {
+                                    stepText = ts.translate('in_transit_step');       // Stage 8
+                                  } else if (anyAcceptedPaid) {
+                                    stepText = ts.translate('match_paid_step');       // Stage 7
+                                  } else if (anyAccepted) {
+                                    stepText = ts.translate('match_accepted_step');   // Stage 6
+                                  } else {
+                                    stepText = ts.translate('vehicule_trouve');       // Stage 5
+                                  }
+                                } else if (requestStatus == RequestStatus.inProgress) {
+                                  stepText = ts.translate('recherche_active');        // Stage 4
+                                } else {
+                                  // Initiated (stages 1–3)
+                                  if (paymentStatusVal == 'Paid' && !isUnassigned) {
+                                    stepText = ts.translate('agent_assigne');
+                                  } else if (paymentStatusVal == 'Paid') {
+                                    stepText = ts.translate('attente_assignation_agent');
+                                  } else if (paymentStatusVal == 'Declined') {
+                                    stepText = ts.translate('payment_failed');
+                                  } else {
+                                    stepText = ts.translate('awaiting_payment');
+                                  }
+                                }
+
                                 IconData statusIcon;
                                 switch (requestStatus) {
                                   case RequestStatus.initiated:
@@ -302,8 +340,8 @@ class _RequestsPageState extends State<RequestsPage> {
                                     id: '#${request['id'].toString().substring(0, 4).toUpperCase()}',
                                     budget: ts.formatPrice((request['budget_max'] ?? 0).toDouble()),
                                     agent: agentName,
-                                    paymentStatus: request['payment_status'] ?? 'Confirmé',
-                                    step: requestStatus == RequestStatus.initiated ? ts.translate('attente_assignation_agent') : ts.translate('identification_vehicules'),
+                                    paymentStatus: paymentStatusVal,
+                                    step: stepText,
                                     icon: statusIcon,
                                     primaryColor: primaryColor,
                                     borderColor: borderColor,
@@ -642,7 +680,7 @@ class _RequestsPageState extends State<RequestsPage> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                isFinished ? ts.translate('statut') : (isPulse ? ts.translate('agent') : ts.translate('paiement')),
+                                _rightColumnLabel(isFinished, isPulse, requestStatus, request, ts),
                                 style: GoogleFonts.plusJakartaSans(
                                   color: mutedForeground,
                                   fontSize: 9,
@@ -651,40 +689,7 @@ class _RequestsPageState extends State<RequestsPage> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              if (isFinished)
-                                Text(
-                                  ts.translate('livre'),
-                                  style: GoogleFonts.montserrat(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              else if (isPulse)
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      agent,
-                                      style: GoogleFonts.montserrat(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.verified_rounded, color: Colors.blue, size: 12),
-                                  ],
-                                )
-                              else
-                                Text(
-                                  ts.translate('confirme'),
-                                  style: GoogleFonts.montserrat(
-                                    color: primaryColor,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                              _rightColumnValue(isFinished, isPulse, requestStatus, request, agent, paymentStatus, primaryColor, ts),
                             ],
                           ),
                         ),
@@ -708,7 +713,7 @@ class _RequestsPageState extends State<RequestsPage> {
                               width: 8,
                               height: 8,
                               decoration: BoxDecoration(
-                                color: isPulse ? primaryColor : mutedForeground.withOpacity(0.3),
+                                color: _stepDotColor(isPulse, requestStatus, paymentStatus, primaryColor, mutedForeground, request['matches'] is List ? request['matches'] as List : []),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -749,6 +754,78 @@ class _RequestsPageState extends State<RequestsPage> {
         ),
       ),
     );
+  }
+
+  String _rightColumnLabel(bool isFinished, bool isPulse, RequestStatus? requestStatus, Map<String, dynamic> request, TranslationService ts) {
+    if (isFinished) return ts.translate('statut');
+    if (requestStatus == RequestStatus.found) {
+      final List matches = request['matches'] is List ? request['matches'] as List : [];
+      if (matches.any((c) => c['status'] == 'Delivered' || c['status'] == 'In Transit')) {
+        return ts.translate('statut');
+      }
+      return ts.translate('resultat');
+    }
+    if (isPulse || (requestStatus == RequestStatus.initiated && request['agent_id'] != null)) return ts.translate('agent');
+    return ts.translate('paiement');
+  }
+
+  Widget _rightColumnValue(bool isFinished, bool isPulse, RequestStatus? requestStatus, Map<String, dynamic> request, String agent, String paymentStatus, Color primaryColor, TranslationService ts) {
+    if (isFinished) {
+      return Text(ts.translate('livre'), style: GoogleFonts.montserrat(color: const Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold));
+    }
+    if (requestStatus == RequestStatus.found) {
+      final List matches = request['matches'] is List ? request['matches'] as List : [];
+      if (matches.any((c) => c['status'] == 'Delivered')) {
+        return Text(ts.translate('livre'), style: GoogleFonts.montserrat(color: const Color(0xFF10B981), fontSize: 13, fontWeight: FontWeight.bold));
+      }
+      if (matches.any((c) => c['status'] == 'In Transit')) {
+        return Text(ts.translate('in_transit'), style: GoogleFonts.montserrat(color: const Color(0xFF06B6D4), fontSize: 13, fontWeight: FontWeight.bold));
+      }
+      if (matches.any((c) => c['status'] == 'Accepted' && c['payment_status'] == 'Paid')) {
+        return Text(ts.translate('confirme'), style: GoogleFonts.montserrat(color: primaryColor, fontSize: 13, fontWeight: FontWeight.bold));
+      }
+      if (matches.any((c) => c['status'] == 'Accepted')) {
+        return Text(ts.translate('match_accepte'), style: GoogleFonts.montserrat(color: const Color(0xFF34D399), fontSize: 13, fontWeight: FontWeight.bold));
+      }
+      return Text(ts.translate('vehicule_trouve'), style: GoogleFonts.montserrat(color: const Color(0xFF60A5FA), fontSize: 13, fontWeight: FontWeight.bold));
+    }
+    if (isPulse || (requestStatus == RequestStatus.initiated && request['agent_id'] != null)) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(agent, style: GoogleFonts.montserrat(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 4),
+          const Icon(Icons.verified_rounded, color: Colors.blue, size: 12),
+        ],
+      );
+    }
+    // Initiated + no agent: show payment status
+    final Color payColor;
+    final String payLabel;
+    if (paymentStatus == 'Paid') {
+      payColor = primaryColor;
+      payLabel = ts.translate('confirme');
+    } else if (paymentStatus == 'Declined') {
+      payColor = Colors.redAccent;
+      payLabel = ts.translate('payment_declined_short');
+    } else {
+      payColor = const Color(0xFFF59E0B);
+      payLabel = ts.translate('payment_pending_short');
+    }
+    return Text(payLabel, style: GoogleFonts.montserrat(color: payColor, fontSize: 13, fontWeight: FontWeight.bold));
+  }
+
+  Color _stepDotColor(bool isPulse, RequestStatus? requestStatus, String paymentStatus, Color primaryColor, Color mutedForeground, List matches) {
+    if (isPulse || requestStatus == RequestStatus.inProgress) return primaryColor;
+    if (requestStatus == RequestStatus.found) {
+      if (matches.any((c) => c['status'] == 'Delivered')) return const Color(0xFF10B981);
+      if (matches.any((c) => c['status'] == 'In Transit')) return const Color(0xFF06B6D4);
+      return const Color(0xFF60A5FA);
+    }
+    if (paymentStatus == 'Declined') return Colors.redAccent;
+    if (paymentStatus == 'Pending') return const Color(0xFFF59E0B);
+    if (paymentStatus == 'Paid') return primaryColor;
+    return mutedForeground.withOpacity(0.3);
   }
 
   Widget _buildPrimaryButton({required String label, required IconData icon, required VoidCallback onTap}) {

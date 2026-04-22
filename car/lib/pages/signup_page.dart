@@ -268,12 +268,12 @@ class _SignUpPageState extends State<SignUpPage> {
 
         final avatarUrl = await _uploadAvatar(response.user!.id);
         if (avatarUrl != null) {
+          await _supabase
+              .schema('cartel')
+              .from('profiles')
+              .update({'avatar_url': avatarUrl}).eq('id', response.user!.id);
           await _supabase.auth.updateUser(
-            UserAttributes(
-              data: {
-                'avatar_url': avatarUrl,
-              },
-            ),
+            UserAttributes(data: {'avatar_url': avatarUrl}),
           );
         }
 

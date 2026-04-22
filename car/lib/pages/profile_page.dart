@@ -136,10 +136,19 @@ class _ProfilePageState extends State<ProfilePage> {
       final fileName = 'avatar.$fileExt';
       final filePath = '${user.id}/$fileName';
 
+      // Delete any existing profile images before uploading to avoid orphaned files
+      try {
+        final existing = await _supabase.storage.from('profiles').list(path: user.id);
+        if (existing.isNotEmpty) {
+          final paths = existing.map((f) => '${user.id}/${f.name}').toList();
+          await _supabase.storage.from('profiles').remove(paths);
+        }
+      } catch (_) {}
+
       await _supabase.storage.from('profiles').upload(
             filePath,
             file,
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
           );
 
       final String publicUrl = _supabase.storage.from('profiles').getPublicUrl(filePath);
@@ -430,6 +439,7 @@ class _ProfilePageState extends State<ProfilePage> {
             borderColor: borderColor,
             primaryColor: const Color(0xFFD4AF37),
             secondaryColor: secondaryColor,
+            onTap: () => Navigator.pushNamed(context, '/chat', arguments: {'is_support': true}),
           ),
           _buildSettingsTile(
             icon: Icons.shield_outlined,
@@ -438,6 +448,7 @@ class _ProfilePageState extends State<ProfilePage> {
             borderColor: borderColor,
             primaryColor: const Color(0xFFD4AF37),
             secondaryColor: secondaryColor,
+            onTap: () => Navigator.pushNamed(context, '/privacy-policy'),
           ),
           _buildSettingsTile(
             icon: Icons.logout_rounded,

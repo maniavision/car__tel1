@@ -187,12 +187,25 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
           .update({'status': 'Accepted'})
           .eq('id', match['id']);
 
-      // 2. Update the request status to Complete
+      // 2. Decline all other matches for this request
+      final otherIds = _matches
+          .where((m) => m['id'] != match['id'])
+          .map((m) => m['id'])
+          .toList();
+      if (otherIds.isNotEmpty) {
+        await _supabase
+            .schema('cartel')
+            .from('matches')
+            .update({'status': 'Declined'})
+            .inFilter('id', otherIds);
+      }
+
+      // 3. Update the request status to Complete
       await _supabase
           .schema('cartel')
           .from('requests')
           .update({
-            'status': 'Complete',
+            'status': 'Completed',
           })
           .eq('id', _request!['id']);
 
@@ -1165,6 +1178,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
               ],
             ),
           ),
+          if (!isInProgress && request?['status'] != 'Completed')
           GestureDetector(
             onTap: () {
               Navigator.pushNamed(context, '/chat', arguments: _request).then((_) => _fetchUnreadCount());

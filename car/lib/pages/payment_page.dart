@@ -134,7 +134,7 @@ class _PaymentPageState extends State<PaymentPage> {
           // Update request status
           debugPrint('Updating request status in cartel.requests...');
           await _supabase.schema('cartel').from('requests').update({
-            'payment_status': 'paid',
+            'payment_status': 'Paid',
           }).eq('id', _request!['id']);
           debugPrint('Request status updated successfully');
         } catch (dbError) {

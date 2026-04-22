@@ -26,6 +26,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _isLoading = true;
   bool _isSending = false;
   bool _isAgentTyping = false;
+  bool _isSupportMode = false;
   RealtimeChannel? _channel;
   Timer? _typingTimer;
   Timer? _myTypingDebounce;
@@ -48,15 +49,25 @@ class _ChatPageState extends State<ChatPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
-      _request = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map && args['is_support'] == true) {
+        _isSupportMode = true;
+        _request = null;
+      } else {
+        _request = args as Map<String, dynamic>?;
+      }
       _initialized = true;
       _loadData();
     }
   }
 
   Future<void> _loadData() async {
-    _loadAgentFromRequest();
-    await _ensureConversation();
+    if (_isSupportMode) {
+      await _ensureSupportConversation();
+    } else {
+      _loadAgentFromRequest();
+      await _ensureConversation();
+    }
     if (_conversationId != null) {
       await _fetchMessages();
       _subscribeToMessages();
@@ -114,6 +125,62 @@ class _ChatPageState extends State<ChatPage> {
     } catch (e) {
       debugPrint('Error ensuring conversation: $e');
     }
+  }
+
+  Future<void> _ensureSupportConversation() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      // Look for an existing support conversation for this user
+      final existing = await _supabase
+          .schema('cartel')
+          .from('conversations')
+          .select('id, agent_id, agents(name, avatar_url, specialty)')
+          .eq('client_id', userId)
+          .eq('is_support', true)
+          .maybeSingle();
+
+      if (existing != null) {
+        _conversationId = existing['id'] as String;
+        _setAgentFromData(existing['agents']);
+        return;
+      }
+
+      // Find an admin/support agent
+      final adminAgent = await _supabase
+          .schema('cartel')
+          .from('agents')
+          .select('id, name, avatar_url, specialty')
+          .eq('role', 'admin')
+          .maybeSingle();
+
+      _setAgentFromData(adminAgent);
+
+      final created = await _supabase
+          .schema('cartel')
+          .from('conversations')
+          .insert({
+            'client_id': userId,
+            'agent_id': adminAgent?['id'],
+            'is_support': true,
+          })
+          .select('id')
+          .single();
+
+      _conversationId = created['id'] as String;
+    } catch (e) {
+      debugPrint('Error ensuring support conversation: $e');
+    }
+  }
+
+  void _setAgentFromData(dynamic agentData) {
+    if (!mounted) return;
+    setState(() => _agent = {
+      'full_name': agentData?['name'] ?? ts.translate('support_center'),
+      'avatar_url': agentData?['avatar_url'],
+      'specialty': agentData?['specialty'] ?? ts.translate('support_center'),
+    });
   }
 
   Future<void> _fetchMessages() async {
@@ -443,16 +510,6 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ],
             ),
-          ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _secondaryColor.withValues(alpha: 0.5),
-              shape: BoxShape.circle,
-              border: Border.all(color: _borderColor),
-            ),
-            child: const Icon(Icons.phone_outlined, color: Colors.white, size: 18),
           ),
         ],
       ),

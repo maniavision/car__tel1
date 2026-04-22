@@ -20,6 +20,7 @@ import 'package:car/pages/signup_page.dart';
 import 'package:car/pages/login_page.dart';
 import 'package:car/pages/leave_review_page.dart';
 import 'package:car/pages/chat_page.dart';
+import 'package:car/pages/privacy_policy_page.dart';
 import 'package:car/services/translation_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -76,6 +77,7 @@ class MyApp extends StatelessWidget {
             '/login': (context) => const LoginPage(),
             '/leave-review': (context) => const LeaveReviewPage(),
             '/chat': (context) => const ChatPage(),
+            '/privacy-policy': (context) => const PrivacyPolicyPage(),
           },
           onGenerateRoute: (settings) {
             final tabPages = <String, Widget>{

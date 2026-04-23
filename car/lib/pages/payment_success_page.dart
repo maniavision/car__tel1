@@ -108,6 +108,16 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage> with SingleTick
                                     height: 1.6,
                                   ),
                                 ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  ts.translate('receipt_email_sent'),
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.dmSans(
+                                    color: primaryColor.withOpacity(0.8),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                                 const SizedBox(height: 48),
                                 _buildDetailsCard(primaryColor, mutedForeground, cardColor, borderColor, ts),
                               ],

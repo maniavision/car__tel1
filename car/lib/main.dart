@@ -64,7 +64,6 @@ class MyApp extends StatelessWidget {
             '/': (context) => const SplashPage(),
             '/language': (context) => const LanguageSelectionPage(),
             '/currency': (context) => const CurrencySelectionPage(),
-            '/create-request': (context) => const CreateRequestPage(),
             '/payment': (context) => const PaymentPage(),
             '/payment-success': (context) => const PaymentSuccessPage(),
             '/payment-failed': (context) => const PaymentFailedPage(),
@@ -80,6 +79,19 @@ class MyApp extends StatelessWidget {
             '/privacy-policy': (context) => const PrivacyPolicyPage(),
           },
           onGenerateRoute: (settings) {
+            if (settings.name == '/create-request') {
+              return PageRouteBuilder(
+                settings: settings,
+                pageBuilder: (_, __, ___) => const CreateRequestPage(),
+                transitionDuration: const Duration(milliseconds: 420),
+                reverseTransitionDuration: const Duration(milliseconds: 320),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
+                      .chain(CurveTween(curve: Curves.easeOutCubic));
+                  return SlideTransition(position: animation.drive(tween), child: child);
+                },
+              );
+            }
             final tabPages = <String, Widget>{
               '/home': const HomePage(),
               '/requests': const RequestsPage(),

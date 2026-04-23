@@ -15,7 +15,7 @@ class CreateRequestPage extends StatefulWidget {
 
 class _CreateRequestPageState extends State<CreateRequestPage> {
   late final SupabaseClient _supabase;
-  RangeValues _currentRangeValues = const RangeValues(25000000, 75000000);
+  RangeValues _currentRangeValues = const RangeValues(0, 100000000);
   String selectedCondition = 'New';
   Color selectedColor = Colors.black;
   bool _isLoading = false;

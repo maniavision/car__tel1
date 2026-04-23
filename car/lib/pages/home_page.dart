@@ -20,11 +20,14 @@ class _HomePageState extends State<HomePage> {
   SupabaseClient get _supabase => widget.supabaseClient ?? Supabase.instance.client;
   late ScrollController _scrollController;
   late ScrollController _hotDealsScrollController;
+  late ScrollController _testimonialsScrollController;
   Timer? _timer;
   bool _isUserInteractingTrending = false;
   bool _isUserInteractingHotDeals = false;
+  bool _isUserInteractingTestimonials = false;
   Timer? _resumeTrendingTimer;
   Timer? _resumeHotDealsTimer;
+  Timer? _resumeTestimonialsTimer;
   List<Map<String, dynamic>> _trendingCars = [];
   List<Map<String, dynamic>> _hotDeals = [];
   List<Map<String, dynamic>> _testimonials = [];
@@ -38,6 +41,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _scrollController = ScrollController();
     _hotDealsScrollController = ScrollController();
+    _testimonialsScrollController = ScrollController();
     _fetchTrendingCars();
     _fetchHotDeals();
     _fetchTestimonials();
@@ -184,8 +188,10 @@ class _HomePageState extends State<HomePage> {
     _timer?.cancel();
     _resumeTrendingTimer?.cancel();
     _resumeHotDealsTimer?.cancel();
+    _resumeTestimonialsTimer?.cancel();
     _scrollController.dispose();
     _hotDealsScrollController.dispose();
+    _testimonialsScrollController.dispose();
     super.dispose();
   }
 
@@ -196,6 +202,9 @@ class _HomePageState extends State<HomePage> {
       }
       if (_hotDealsScrollController.hasClients && !_isUserInteractingHotDeals) {
         _performAutoScroll(_hotDealsScrollController);
+      }
+      if (_testimonialsScrollController.hasClients && !_isUserInteractingTestimonials) {
+        _performAutoScroll(_testimonialsScrollController);
       }
     });
   }
@@ -800,112 +809,123 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 16),
                 SizedBox(
                   height: 200,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _testimonials.length,
-                    separatorBuilder: (context, index) => const SizedBox(width: 16),
-                    itemBuilder: (context, index) {
-                      final t = _testimonials[index];
-                      return Container(
-                        width: MediaQuery.of(context).size.width - 48,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(40),
-                          border: Border.all(color: borderColor),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Stack(
-                          children: [
-                            if (t['image_url'] != null)
-                              CachedNetworkImage(
-                                imageUrl: t['image_url'],
-                                width: double.infinity,
-                                height: double.infinity,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: const Color(0xFF1F1F1F),
-                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: const Color(0xFF1F1F1F),
-                                  child: const Center(child: Icon(Icons.image_rounded, color: Colors.white24, size: 40)),
-                                ),
-                              )
-                            else
-                              Container(
-                                color: const Color(0xFF1F1F1F),
-                                width: double.infinity,
-                                height: double.infinity,
-                              ),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [Colors.black.withOpacity(0.9), Colors.black.withOpacity(0.4), Colors.transparent],
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(24.0),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '"${t['content']}"',
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.dmSans(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: List.generate(5, (index) {
-                                      final starCount = t['stars'] ?? 5;
-                                      return Icon(
-                                        index < starCount ? Icons.star_rounded : Icons.star_outline_rounded,
-                                        color: index < starCount ? primaryColor : Colors.white24,
-                                        size: 14,
-                                      );
-                                    }),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: const Color(0xFF1F1F1F),
-                                          border: Border.all(color: primaryColor.withOpacity(0.2)),
-                                        ),
-                                        child: const Icon(Icons.person_rounded, color: Colors.white, size: 14),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '${t['client_name']}, ${t['display_location']}',
-                                        style: GoogleFonts.dmSans(
-                                          color: Colors.white.withOpacity(0.7),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 1.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
+                  child: NotificationListener<UserScrollNotification>(
+                    onNotification: (notification) {
+                      setState(() => _isUserInteractingTestimonials = true);
+                      _resumeTestimonialsTimer?.cancel();
+                      _resumeTestimonialsTimer = Timer(const Duration(seconds: 3), () {
+                        if (mounted) setState(() => _isUserInteractingTestimonials = false);
+                      });
+                      return false;
                     },
+                    child: ListView.separated(
+                      controller: _testimonialsScrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _testimonials.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 16),
+                      itemBuilder: (context, index) {
+                        final t = _testimonials[index];
+                        return Container(
+                          width: MediaQuery.of(context).size.width - 48,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(40),
+                            border: Border.all(color: borderColor),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Stack(
+                            children: [
+                              if (t['image_url'] != null)
+                                CachedNetworkImage(
+                                  imageUrl: t['image_url'],
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    color: const Color(0xFF1F1F1F),
+                                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
+                                    color: const Color(0xFF1F1F1F),
+                                    child: const Center(child: Icon(Icons.image_rounded, color: Colors.white24, size: 40)),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  color: const Color(0xFF1F1F1F),
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.black.withOpacity(0.9), Colors.black.withOpacity(0.4), Colors.transparent],
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(24.0),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '"${t['content']}"',
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.dmSans(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: List.generate(5, (index) {
+                                        final starCount = t['stars'] ?? 5;
+                                        return Icon(
+                                          index < starCount ? Icons.star_rounded : Icons.star_outline_rounded,
+                                          color: index < starCount ? primaryColor : Colors.white24,
+                                          size: 14,
+                                        );
+                                      }),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: const Color(0xFF1F1F1F),
+                                            border: Border.all(color: primaryColor.withOpacity(0.2)),
+                                          ),
+                                          child: const Icon(Icons.person_rounded, color: Colors.white, size: 14),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${t['client_name']}, ${t['display_location']}',
+                                          style: GoogleFonts.dmSans(
+                                            color: Colors.white.withOpacity(0.7),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],

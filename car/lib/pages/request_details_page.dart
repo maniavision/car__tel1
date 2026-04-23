@@ -1145,9 +1145,11 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
               shape: BoxShape.circle,
               border: Border.all(color: primaryColor.withOpacity(0.3), width: 2),
               image: DecorationImage(
-                image: (agentPhotoUrl != null && agentPhotoUrl.toString().isNotEmpty)
-                    ? NetworkImage(agentPhotoUrl.toString())
-                    : const NetworkImage('https://randomuser.me/api/portraits/men/12.jpg'),
+                image: CachedNetworkImageProvider(
+                  (agentPhotoUrl != null && agentPhotoUrl.toString().isNotEmpty)
+                      ? agentPhotoUrl.toString()
+                      : 'https://randomuser.me/api/portraits/men/12.jpg',
+                ),
                 fit: BoxFit.cover,
               ),
             ),

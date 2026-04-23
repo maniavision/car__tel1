@@ -452,7 +452,7 @@ class _ChatPageState extends State<ChatPage> {
                   children: [
                     CircleAvatar(
                       radius: 20,
-                      backgroundImage: agentAvatar != null ? NetworkImage(agentAvatar) : null,
+                      backgroundImage: agentAvatar != null ? CachedNetworkImageProvider(agentAvatar) : null,
                       backgroundColor: _secondaryColor,
                       child: agentAvatar == null
                           ? Text(

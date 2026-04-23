@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
@@ -786,12 +787,17 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
               // Image Area
               Stack(
                 children: [
-                  Image.network(
-                    imageUrl,
+                  CachedNetworkImage(
+                    imageUrl: imageUrl,
                     height: 192,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
+                    placeholder: (context, url) => Container(
+                      height: 192,
+                      color: Colors.white.withOpacity(0.05),
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       height: 192,
                       color: Colors.white.withOpacity(0.05),
                       child: const Icon(Icons.directions_car_rounded, color: Colors.white24, size: 48),

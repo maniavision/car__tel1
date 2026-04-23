@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -325,9 +326,17 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
               itemBuilder: (context, index) {
                 return GestureDetector(
                   onTap: () => _showFullScreenImage(context, images, index),
-                  child: Image.network(
-                    images[index],
+                  child: CachedNetworkImage(
+                    imageUrl: images[index],
                     fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      color: const Color(0xFF1F1F1F),
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: const Color(0xFF1F1F1F),
+                      child: const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white24, size: 48)),
+                    ),
                   ),
                 );
               },
@@ -466,7 +475,15 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
               clipBehavior: Clip.antiAlias,
               child: Opacity(
                 opacity: isSelected ? 1 : 0.4,
-                child: Image.network(images[index], fit: BoxFit.cover),
+                child: CachedNetworkImage(
+                  imageUrl: images[index],
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(color: const Color(0xFF1F1F1F)),
+                  errorWidget: (context, url, error) => Container(
+                    color: const Color(0xFF1F1F1F),
+                    child: const Icon(Icons.broken_image_rounded, color: Colors.white24, size: 24),
+                  ),
+                ),
               ),
             ),
           );
@@ -876,10 +893,12 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
                 minScale: 0.5,
                 maxScale: 4.0,
                 child: Center(
-                  child: Image.network(
-                    widget.images[index],
+                  child: CachedNetworkImage(
+                    imageUrl: widget.images[index],
                     fit: BoxFit.contain,
                     width: MediaQuery.of(context).size.width,
+                    placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
+                    errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white24, size: 48)),
                   ),
                 ),
               );

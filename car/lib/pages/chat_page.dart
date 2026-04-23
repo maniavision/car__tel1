@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -730,12 +731,13 @@ class _ChatPageState extends State<ChatPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Image.network(
-              imageUrl,
+            CachedNetworkImage(
+              imageUrl: imageUrl,
               height: 140,
               width: double.infinity,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(height: 140, color: _secondaryColor),
+              placeholder: (context, url) => Container(height: 140, color: _secondaryColor),
+              errorWidget: (context, url, error) => Container(height: 140, color: _secondaryColor),
             ),
             if (caption.isNotEmpty)
               Padding(

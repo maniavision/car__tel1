@@ -182,8 +182,8 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       // Logo
                       Center(
-                        child: Image.network(
-                          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/ai/Transparent-File-01-ARxLMHKJIUT.png',
+                        child: Image.asset(
+                          'assets/new_logo.png',
                           width: 220,
                           height: 120,
                           fit: BoxFit.contain,
@@ -250,13 +250,16 @@ class _LoginPageState extends State<LoginPage> {
                           const SizedBox(height: 12),
                           Align(
                             alignment: Alignment.centerRight,
-                            child: Text(
-                              ts.translate('forgot_password'),
-                              style: GoogleFonts.dmSans(
-                                color: mutedForeground,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
+                            child: GestureDetector(
+                              onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+                              child: Text(
+                                ts.translate('forgot_password'),
+                                style: GoogleFonts.dmSans(
+                                  color: mutedForeground,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.0,
+                                ),
                               ),
                             ),
                           ),

@@ -121,8 +121,8 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
     final mileage = car['mileage']?.toString() ?? '24.500';
     final engine = car['engine'] ?? 'V6 Turbo Hybride';
     final transmission = car['transmission'] ?? '9G-Tronic Auto';
-    final exteriorColor = car['exterior_color'] ?? 'Silver Met.';
-    final interiorColor = car['interior_color'] ?? 'Espresso Br.';
+    final exteriorColor = car['exterior_color'] ?? 'N/A';
+    final interiorColor = car['interior_color'] ?? 'N/A';
     final fuelType = car['fuel_type'];
     final bodyStyle = car['body_style'];
     final driveTrain = car['drive_train'];
@@ -198,6 +198,18 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (isDeal)
+                      Text(
+                        ts.formatPrice((car['strike_price'] ?? (car['final_price'] ?? 0) / 0.92).toDouble()),
+                        style: GoogleFonts.montserrat(
+                          color: const Color(0xFF990000),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: Colors.red,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
                     Text(
                       ts.formatPrice((car['final_price'] ?? 0).toDouble()),
                       style: GoogleFonts.montserrat(
@@ -530,11 +542,14 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
         children: [
           Icon(icon, color: isHighlight ? primaryColor : Colors.white38, size: 20),
           const SizedBox(width: 16),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 14),
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Text(
             value,
             style: GoogleFonts.plusJakartaSans(

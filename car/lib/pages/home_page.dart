@@ -145,8 +145,8 @@ class _HomePageState extends State<HomePage> {
           .from('car_deal')
           .select('*')
           .eq('status', 'Available')
-          .order('created_at', ascending: true)
-          .limit(15);
+          .order('created_at', ascending: false)
+          .limit(20);
       
       if (mounted) {
         setState(() {

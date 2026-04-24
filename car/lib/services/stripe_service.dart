@@ -45,7 +45,7 @@ class StripeService {
         Stripe.urlScheme = 'cartel';
         await Stripe.instance.applySettings();
         _isInitialized = true;
-        debugPrint('Stripe initialized successfully with key: ${Stripe.publishableKey?.substring(0, 8)}...');
+        debugPrint('Stripe initialized successfully with key: ${Stripe.publishableKey!.substring(0, 8)}...');
       } else {
         debugPrint('Error: Stripe keys not found in Edge Function response');
       }

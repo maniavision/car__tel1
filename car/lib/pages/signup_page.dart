@@ -101,7 +101,7 @@ class _SignUpPageState extends State<SignUpPage> {
           .schema('cartel')
           .from('country_calling_codes')
           .select('id, country_name, calling_code')
-          .order('country_name');
+          .order('country_name', ascending: true);
       
       setState(() {
         _countries = List<Map<String, dynamic>>.from(response);
@@ -359,8 +359,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   child: Column(
                     children: [
                       Center(
-                        child: Image.network(
-                          'https://ggrhecslgdflloszjkwl.supabase.co/storage/v1/object/public/user-assets/rRHZ5DOPVSb/ai/Transparent-File-01-ARxLMHKJIUT.png',
+                        child: Image.asset(
+                          'assets/new_logo.png',
                           width: 180,
                           height: 100,
                           fit: BoxFit.contain,

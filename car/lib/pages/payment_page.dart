@@ -200,36 +200,52 @@ class _PaymentPageState extends State<PaymentPage> {
           debugPrint('Request status updated successfully');
 
           // 5. Send receipt email
-          debugPrint('Sending receipt email...');
+          debugPrint('Fetching user data for receipt email...');
           final ts = TranslationService();
           final String currency = ts.currentCurrency == 'USD' ? 'USD' : 'XAF';
           final String amount = ts.currentCurrency == 'USD' ? '50.00' : '30,000';
 
           // Get user profile data for email
-          final profileResponse = await _supabase
-              .schema('cartel')
-              .from('profiles')
-              .select('full_name')
-              .eq('id', user.id)
-              .single();
+          String userName = 'Valued Customer';
+          try {
+            final profileResponse = await _supabase
+                .schema('cartel')
+                .from('profiles')
+                .select('full_name')
+                .eq('id', user.id)
+                .maybeSingle();
+            if (profileResponse != null && profileResponse['full_name'] != null) {
+              userName = profileResponse['full_name'];
+            } else if (user.userMetadata?['full_name'] != null) {
+              userName = user.userMetadata!['full_name'];
+            }
+          } catch (e) {
+            debugPrint('Error fetching profile for email: $e');
+            if (user.userMetadata?['full_name'] != null) {
+              userName = user.userMetadata!['full_name'];
+            }
+          }
 
-          final String userName = profileResponse['full_name'] ?? user.userMetadata?['full_name'] ?? 'Valued Customer';
           final String userEmail = user.email ?? '';
-
           if (userEmail.isNotEmpty) {
-            final emailSent = await EmailService().sendPaymentReceipt(
-              userEmail: userEmail,
-              userName: userName,
-              transactionId: paymentIntentId,
-              amount: amount,
-              currency: currency,
-              paymentDate: DateTime.now(),
-            );
+            debugPrint('Sending receipt email to: $userEmail');
+            try {
+              final emailSent = await EmailService().sendPaymentReceipt(
+                userEmail: userEmail,
+                userName: userName,
+                transactionId: paymentIntentId,
+                amount: amount,
+                currency: currency,
+                paymentDate: DateTime.now(),
+              );
 
-            if (emailSent) {
-              debugPrint('Receipt email sent successfully');
-            } else {
-              debugPrint('Failed to send receipt email');
+              if (emailSent) {
+                debugPrint('Receipt email sent successfully');
+              } else {
+                debugPrint('Failed to send receipt email (returned false)');
+              }
+            } catch (emailError) {
+              debugPrint('Error caught in payment_page while sending email: $emailError');
             }
           } else {
             debugPrint('User email not available, skipping receipt email');
@@ -434,52 +450,61 @@ class _PaymentPageState extends State<PaymentPage> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        ts.translate('service_fee'),
-                                        style: GoogleFonts.plusJakartaSans(
-                                          color: mutedForeground,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 1.5,
+                                  Flexible(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          ts.translate('service_fee'),
+                                          style: GoogleFonts.plusJakartaSans(
+                                            color: mutedForeground,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.5,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        ts.formatPrice(30000),
-                                        style: GoogleFonts.montserrat(
-                                          color: primaryColor,
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          ts.formatPrice(30000),
+                                          style: GoogleFonts.montserrat(
+                                            color: primaryColor,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        ts.translate('currency_label'),
-                                        style: GoogleFonts.plusJakartaSans(
-                                          color: mutedForeground,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 1.5,
+                                  const SizedBox(width: 16),
+                                  Flexible(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          ts.translate('currency_label'),
+                                          style: GoogleFonts.plusJakartaSans(
+                                            color: mutedForeground,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.5,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        ts.currentCurrency == 'USD' ? 'USD' : 'XAF / CFA',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.0,
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          ts.currentCurrency == 'USD' ? 'USD' : 'XAF / CFA',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.0,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),

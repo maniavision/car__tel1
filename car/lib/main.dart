@@ -18,13 +18,15 @@ import 'package:car/pages/trending_cars_page.dart';
 import 'package:car/pages/car_deals_page.dart';
 import 'package:car/pages/signup_page.dart';
 import 'package:car/pages/login_page.dart';
+import 'package:car/pages/forgot_password_page.dart';
+import 'package:car/pages/reset_password_page.dart';
 import 'package:car/pages/leave_review_page.dart';
 import 'package:car/pages/chat_page.dart';
+import 'package:car/pages/help_center_page.dart';
 import 'package:car/pages/privacy_policy_page.dart';
 import 'package:car/services/translation_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,8 +39,35 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      debugPrint('Auth event: $event');
+      if (event == AuthChangeEvent.passwordRecovery) {
+        debugPrint('Password recovery detected, navigating to /reset-password');
+        // Add a small delay to ensure the navigator is ready during cold starts
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _navigatorKey.currentState?.pushNamed('/reset-password');
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +75,7 @@ class MyApp extends StatelessWidget {
       listenable: TranslationService(),
       builder: (context, _) {
         return MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'CarTel',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
@@ -74,8 +104,11 @@ class MyApp extends StatelessWidget {
             '/deals': (context) => const CarDealsPage(),
             '/signup': (context) => const SignUpPage(),
             '/login': (context) => const LoginPage(),
+            '/forgot-password': (context) => const ForgotPasswordPage(),
+            '/reset-password': (context) => const ResetPasswordPage(),
             '/leave-review': (context) => const LeaveReviewPage(),
             '/chat': (context) => const ChatPage(),
+            '/help-center': (context) => const HelpCenterPage(),
             '/privacy-policy': (context) => const PrivacyPolicyPage(),
           },
           onGenerateRoute: (settings) {

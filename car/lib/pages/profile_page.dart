@@ -439,7 +439,7 @@ class _ProfilePageState extends State<ProfilePage> {
             borderColor: borderColor,
             primaryColor: const Color(0xFFD4AF37),
             secondaryColor: secondaryColor,
-            onTap: () => Navigator.pushNamed(context, '/chat', arguments: {'is_support': true}),
+            onTap: () => Navigator.pushNamed(context, '/help-center'),
           ),
           _buildSettingsTile(
             icon: Icons.shield_outlined,

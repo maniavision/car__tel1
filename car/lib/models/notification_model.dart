@@ -72,6 +72,13 @@ class NotificationModel {
       return descriptionFr!;
     }
 
+    final t = type.toLowerCase();
+    if (language == 'English') {
+      if (t == 'match' || t == 'found') return 'A new match has been found for your request.';
+      if (t == 'assignment' || t == 'agent_assigned') return 'An agent has been assigned to your request.';
+      if (t == 'payment' || t == 'payment_confirmed') return 'Your payment has been successfully processed.';
+    }
+
     return description;
   }
 

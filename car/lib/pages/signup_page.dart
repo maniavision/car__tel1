@@ -656,7 +656,7 @@ class _SignUpPageState extends State<SignUpPage> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            label,
+            label.toUpperCase(),
             style: GoogleFonts.dmSans(
               color: primaryColor,
               fontSize: 10,
@@ -711,7 +711,7 @@ class _SignUpPageState extends State<SignUpPage> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            label,
+            label.toUpperCase(),
             style: GoogleFonts.dmSans(
               color: primaryColor,
               fontSize: 10,

@@ -451,7 +451,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              ts.translate('searching'),
+                              ts.translate('searching').toUpperCase(),
                               style: GoogleFonts.plusJakartaSans(
                                 color: primaryColor,
                                 fontSize: 8,
@@ -598,7 +598,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              ts.translate('trouve'),
+                              ts.translate('trouve').toUpperCase(),
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.green,
                                 fontSize: 8,
@@ -1247,7 +1247,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
         border: Border.all(color: textColor.withOpacity(0.2)),
       ),
       child: Text(
-        label,
+        label.toUpperCase(),
         style: GoogleFonts.plusJakartaSans(
           color: textColor,
           fontSize: 9,

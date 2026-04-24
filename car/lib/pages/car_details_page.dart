@@ -781,7 +781,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                               const Icon(Icons.favorite_rounded, size: 20),
                             const SizedBox(width: 12),
                             Text(
-                              ts.translate('interested'),
+                              ts.translate('interested').toUpperCase(),
                               style: GoogleFonts.montserrat(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w900,

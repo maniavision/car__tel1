@@ -132,7 +132,7 @@ void main() {
       ));
 
       // Tap Sign Up without filling anything
-      final signUpButton = find.text('CREATE_ACCOUNT_BTN').first;
+      final signUpButton = find.text('create_account_btn').first;
       await tester.ensureVisible(signUpButton);
       await tester.tap(signUpButton);
       await tester.pump();

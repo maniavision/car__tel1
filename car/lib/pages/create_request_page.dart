@@ -945,7 +945,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
   Widget _buildLabel(String text, Color mutedForeground) {
     return Text(
-      text,
+      text.toUpperCase(),
       style: GoogleFonts.montserrat(
         color: mutedForeground.withOpacity(0.8),
         fontSize: 10,
@@ -992,7 +992,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             left: 16,
             top: 8,
             child: Text(
-              label,
+              label.toUpperCase(),
               style: GoogleFonts.dmSans(
                 color: const Color(0xFF888888).withOpacity(0.6),
                 fontSize: 8,
@@ -1054,7 +1054,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
             left: 16,
             top: 8,
             child: Text(
-              label,
+              label.toUpperCase(),
               style: GoogleFonts.dmSans(
                 color: const Color(0xFF888888).withOpacity(0.6),
                 fontSize: 8,

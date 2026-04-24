@@ -625,7 +625,7 @@ class _HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      ts.translate('trending_now'),
+                      ts.translate('trending_now').toUpperCase(),
                       style: GoogleFonts.montserrat(
                         color: primaryColor,
                         fontSize: 12,
@@ -713,7 +713,7 @@ class _HomePageState extends State<HomePage> {
                         const Icon(Icons.fireplace_rounded, color: Colors.redAccent, size: 18),
                         const SizedBox(width: 8),
                         Text(
-                          ts.translate('hot_deals'),
+                          ts.translate('hot_deals').toUpperCase(),
                           style: GoogleFonts.montserrat(
                             color: primaryColor,
                             fontSize: 12,
@@ -797,7 +797,7 @@ class _HomePageState extends State<HomePage> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Text(
-                    ts.translate('experiences_clients'),
+                    ts.translate('experiences_clients').toUpperCase(),
                     style: GoogleFonts.montserrat(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 12,

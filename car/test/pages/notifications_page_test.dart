@@ -19,6 +19,8 @@ NotificationModel _makeNotification({
       userId: 'user-123',
       title: title,
       description: description,
+      titleFr: title,
+      descriptionFr: description,
       type: type,
       createdAt: DateTime.now(),
       isRead: isRead,

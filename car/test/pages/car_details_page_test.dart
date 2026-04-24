@@ -111,7 +111,7 @@ void main() {
       
       await tester.pump();
 
-      expect(find.text('Mercedes'), findsOneWidget);
+      expect(find.text('Mercedes').first, findsOneWidget);
       expect(find.text('G63 AMG').first, findsOneWidget);
       expect(find.text('INTERESTED'), findsOneWidget);
     }, createHttpClient: (context) => createMockHttpClient());

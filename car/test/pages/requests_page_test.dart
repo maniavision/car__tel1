@@ -116,7 +116,7 @@ void main() {
     expect(find.text('Honda Civic'), findsOneWidget);
 
     // Tap on "trouve" filter (mocked to return 'trouve' in TranslationService)
-    await tester.tap(find.text('trouve'));
+    await tester.tap(find.text('trouve').first);
     await tester.pump();
 
     expect(find.text('Toyota Corolla'), findsOneWidget);

@@ -56,7 +56,7 @@ void main() {
     test('falls back to title for Français when titleFr is not set', () {
       final model = NotificationModel(
         id: '1', userId: 'u', title: 'Titre de base', description: 'd',
-        type: 'match', createdAt: DateTime(2024), isRead: false,
+        type: 'custom', createdAt: DateTime(2024), isRead: false,
       );
       expect(model.getDisplayTitle('Français'), 'Titre de base');
     });

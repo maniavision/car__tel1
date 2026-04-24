@@ -414,7 +414,7 @@ class _LoginPageState extends State<LoginPage> {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            label,
+            label.toUpperCase(),
             style: GoogleFonts.dmSans(
               color: primaryColor,
               fontSize: 10,

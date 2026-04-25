@@ -120,9 +120,11 @@ class _ChatPageState extends State<ChatPage> {
             'agent_id': agentId,
           })
           .select('id')
-          .single();
+          .maybeSingle();
 
-      _conversationId = created['id'] as String;
+      if (created != null) {
+        _conversationId = created['id'] as String;
+      }
     } catch (e) {
       debugPrint('Error ensuring conversation: $e');
     }
@@ -167,9 +169,11 @@ class _ChatPageState extends State<ChatPage> {
             'is_support': true,
           })
           .select('id')
-          .single();
+          .maybeSingle();
 
-      _conversationId = created['id'] as String;
+      if (created != null) {
+        _conversationId = created['id'] as String;
+      }
     } catch (e) {
       debugPrint('Error ensuring support conversation: $e');
     }
@@ -349,9 +353,9 @@ class _ChatPageState extends State<ChatPage> {
             'content': text,
           })
           .select()
-          .single();
+          .maybeSingle();
 
-      if (mounted) {
+      if (mounted && inserted != null) {
         setState(() {
           final idx = _messages.indexWhere((m) => m['id'] == optimisticId);
           if (idx != -1) _messages[idx] = inserted;

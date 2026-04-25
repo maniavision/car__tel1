@@ -5,11 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:car/models/notification_model.dart';
 
 class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
-  static NotificationService _instance = NotificationService._internal();
-  factory NotificationService() => _instance;
+  static NotificationService? _instance;
+  factory NotificationService() => _instance ??= NotificationService._internal();
   NotificationService._internal() {
     WidgetsBinding.instance.addObserver(this);
-    _listenToAuthState();
+    // Use a small delay to allow mockClient to be set before init
+    Future.microtask(() => _listenToAuthState());
   }
 
   @visibleForTesting
@@ -17,12 +18,21 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
     _instance = mock;
   }
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  SupabaseClient? _mockClient;
+  AudioPlayer? _mockAudioPlayer;
+
+  @visibleForTesting
+  set mockClient(SupabaseClient client) => _mockClient = client;
+
+  @visibleForTesting
+  set mockAudioPlayer(AudioPlayer player) => _mockAudioPlayer = player;
+
+  SupabaseClient get _supabase => _mockClient ?? Supabase.instance.client;
   List<NotificationModel> _notifications = [];
   bool _isLoading = false;
   RealtimeChannel? _channel;
   StreamSubscription<AuthState>? _authSubscription;
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  late final AudioPlayer _audioPlayer = _mockAudioPlayer ?? AudioPlayer();
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -166,13 +176,13 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<bool> deleteNotification(String notificationId) async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) return false;
 
       debugPrint('Attempting to delete notification: $notificationId for user: ${user.id}');
 
       // Use .match for multiple filters which is often more reliable in PostgREST
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('notifications')
           .delete()
@@ -207,12 +217,12 @@ class NotificationService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<bool> clearAll() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user == null) return false;
 
       debugPrint('Attempting to clear all notifications for user: ${user.id}');
 
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('notifications')
           .delete()

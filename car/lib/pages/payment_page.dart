@@ -244,6 +244,17 @@ class _PaymentPageState extends State<PaymentPage> {
               } else {
                 debugPrint('Failed to send receipt email (returned false)');
               }
+
+              // Also send notification to admin emails
+              debugPrint('Sending notification to admin emails...');
+              await EmailService().sendAdminPaymentNotification(
+                userName: userName,
+                userEmail: userEmail,
+                requestId: _request!['id'],
+                transactionId: paymentIntentId,
+                amount: amount,
+                currency: currency,
+              );
             } catch (emailError) {
               debugPrint('Error caught in payment_page while sending email: $emailError');
             }

@@ -1,11 +1,17 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EmailService {
-  static EmailService _instance = EmailService._internal();
-  factory EmailService() => _instance;
+  static EmailService? _instance;
+  factory EmailService() => _instance ??= EmailService._internal();
   EmailService._internal();
 
-  final SupabaseClient _supabase = Supabase.instance.client;
+  SupabaseClient? _mockClient;
+
+  @visibleForTesting
+  set mockClient(SupabaseClient client) => _mockClient = client;
+
+  SupabaseClient get _supabase => _mockClient ?? Supabase.instance.client;
 
   Future<bool> sendPaymentReceipt({
     required String userEmail,
@@ -37,6 +43,31 @@ class EmailService {
     } catch (e) {
       print('Error sending receipt email: $e');
       return false;
+    }
+  }
+
+  Future<void> sendAdminPaymentNotification({
+    required String userName,
+    required String userEmail,
+    required String requestId,
+    required String transactionId,
+    required String amount,
+    required String currency,
+  }) async {
+    try {
+      await _supabase.functions.invoke(
+        'notify-admin-payment',
+        body: {
+          'userName': userName,
+          'userEmail': userEmail,
+          'requestId': requestId,
+          'transactionId': transactionId,
+          'amount': amount,
+          'currency': currency,
+        },
+      );
+    } catch (e) {
+      print('Error sending admin notification: $e');
     }
   }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:car/services/notification_service.dart';
 import 'package:car/services/translation_service.dart';
 import 'package:car/services/stripe_service.dart';
@@ -41,6 +42,10 @@ class MockSupabaseQuerySchema extends Mock implements SupabaseQuerySchema {}
 class MockSupabaseQueryBuilder extends Mock implements SupabaseQueryBuilder {}
 class MockFunctionsClient extends Mock implements FunctionsClient {}
 class MockFunctionResponse extends Mock implements FunctionResponse {}
+class MockAuthResponse extends Mock implements AuthResponse {}
+class MockUserResponse extends Mock implements UserResponse {}
+class MockAudioPlayer extends Mock implements AudioPlayer {}
+class MockRealtimeChannel extends Mock implements RealtimeChannel {}
 
 class FakePostgrestBuilder<T> extends Fake implements PostgrestFilterBuilder<T>, PostgrestTransformBuilder<T> {
   final dynamic _value;
@@ -49,7 +54,15 @@ class FakePostgrestBuilder<T> extends Fake implements PostgrestFilterBuilder<T>,
   @override
   PostgrestFilterBuilder<T> eq(String column, Object? value) => this;
   @override
+  PostgrestFilterBuilder<T> match(Map<String, dynamic> query) => this;
+  @override
   PostgrestFilterBuilder<T> inFilter(String column, List values) => this;
+  @override
+  PostgrestFilterBuilder<T> isFilter(String column, bool? value) => this;
+  @override
+  PostgrestTransformBuilder<List<Map<String, dynamic>>> select([String columns = '*']) {
+    return FakePostgrestBuilder<List<Map<String, dynamic>>>(_value is List ? _value : [_value]);
+  }
   @override
   PostgrestFilterBuilder<T> order(String column, {bool? ascending, bool? nullsFirst, String? referencedTable}) => this;
   @override

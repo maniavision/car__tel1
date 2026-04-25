@@ -67,11 +67,11 @@ class _LeaveReviewPageState extends State<LeaveReviewPage> {
           .from('profiles')
           .select('full_name, country_id')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
       await Supabase.instance.client.schema('cartel').from('testimonials').insert({
-        'client_name': profile['full_name'] ?? 'Client CarTel',
-        'location': profile['country_id'] ?? 'Douala',
+        'client_name': profile?['full_name'] ?? 'Client CarTel',
+        'location': profile?['country_id'] ?? 'Douala',
         'content': _commentController.text.trim(),
         'image_url': imageUrl,
         'stars': _rating,

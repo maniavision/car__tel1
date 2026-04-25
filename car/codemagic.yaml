@@ -1,0 +1,358 @@
+workflows:
+
+  # ──────────────────────────────────────────────────────────────
+  # 1. PULL REQUEST — runs on every PR (tests only, no deploy)
+  # ──────────────────────────────────────────────────────────────
+  pull-request:
+    name: Pull Request Checks
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      groups:
+        - env_vars
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: develop
+          include: true
+    scripts:
+      - name: Get packages
+        script: flutter pub get
+
+      - name: Verify formatting
+        script: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze code
+        script: flutter analyze --fatal-infos
+
+      - name: Run tests
+        script: |
+          flutter test --coverage \
+            --reporter expanded
+
+    artifacts:
+      - coverage/**
+
+
+  # ──────────────────────────────────────────────────────────────
+  # 2. iOS TESTING — TestFlight (develop branch)
+  # ──────────────────────────────────────────────────────────────
+  ios-testing:
+    name: iOS Testing (TestFlight)
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.neovation.cartel
+      groups:
+        - app_store_credentials
+        - env_vars
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: develop
+          include: true
+    scripts:
+      - name: Set up staging env
+        script: |
+          cat > $CM_BUILD_DIR/env/staging.json << EOF
+          {
+            "ENV": "staging",
+            "SUPABASE_URL": "$SUPABASE_URL_STAGING",
+            "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY_STAGING",
+            "STRIPE_PUBLISHABLE_KEY": "$STRIPE_PUBLISHABLE_KEY_TEST"
+          }
+          EOF
+
+      - name: Get packages
+        script: flutter pub get
+
+      - name: Analyze
+        script: flutter analyze
+
+      - name: Run tests
+        script: flutter test
+
+      - name: Install pods
+        script: cd ios && pod install
+
+      - name: Set build number
+        script: |
+          BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          agvtool new-version -all $((BUILD_NUMBER + 1))
+
+      - name: Build iOS
+        script: |
+          flutter build ios --release \
+            --dart-define-from-file=env/staging.json \
+            --no-codesign
+
+      - name: Package IPA
+        script: |
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace ios/Runner.xcworkspace \
+            --scheme Runner
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+
+    publishing:
+      email:
+        recipients:
+          - noreply@cartelplusadmin.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers
+        submit_to_app_store: false
+
+
+  # ──────────────────────────────────────────────────────────────
+  # 3. ANDROID TESTING — Internal Track (develop branch)
+  # ──────────────────────────────────────────────────────────────
+  android-testing:
+    name: Android Testing (Internal Track)
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      android_signing:
+        - cartel_keystore
+      groups:
+        - google_play_credentials
+        - env_vars
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: develop
+          include: true
+    scripts:
+      - name: Set up staging env
+        script: |
+          cat > $CM_BUILD_DIR/env/staging.json << EOF
+          {
+            "ENV": "staging",
+            "SUPABASE_URL": "$SUPABASE_URL_STAGING",
+            "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY_STAGING",
+            "STRIPE_PUBLISHABLE_KEY": "$STRIPE_PUBLISHABLE_KEY_TEST"
+          }
+          EOF
+
+      - name: Get packages
+        script: flutter pub get
+
+      - name: Analyze
+        script: flutter analyze
+
+      - name: Run tests
+        script: flutter test
+
+      - name: Set build number
+        script: |
+          BUILD_NUMBER=$(($(google-play get-latest-build-number \
+            --package-name io.cartel.app \
+            --tracks=internal) + 1))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
+
+      - name: Build Android AAB
+        script: |
+          flutter build appbundle --release \
+            --build-number=$BUILD_NUMBER \
+            --dart-define-from-file=env/staging.json
+
+    artifacts:
+      - build/app/outputs/bundle/release/app-release.aab
+      - build/app/outputs/mapping/release/mapping.txt
+
+    publishing:
+      email:
+        recipients:
+          - noreply@cartelplusadmin.com
+        notify:
+          success: true
+          failure: true
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: false
+
+
+  # ──────────────────────────────────────────────────────────────
+  # 4. iOS PRODUCTION — App Store (main branch)
+  # ──────────────────────────────────────────────────────────────
+  ios-production:
+    name: iOS Production (App Store)
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: io.cartel.app
+      groups:
+        - app_store_credentials
+        - env_vars
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+    scripts:
+      - name: Set up prod env
+        script: |
+          cat > $CM_BUILD_DIR/env/prod.json << EOF
+          {
+            "ENV": "prod",
+            "SUPABASE_URL": "$SUPABASE_URL",
+            "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY",
+            "STRIPE_PUBLISHABLE_KEY": "$STRIPE_PUBLISHABLE_KEY_LIVE"
+          }
+          EOF
+
+      - name: Get packages
+        script: flutter pub get
+
+      - name: Analyze
+        script: flutter analyze --fatal-infos
+
+      - name: Run tests
+        script: flutter test
+
+      - name: Install pods
+        script: cd ios && pod install
+
+      - name: Set build number
+        script: |
+          BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          agvtool new-version -all $((BUILD_NUMBER + 1))
+
+      - name: Build iOS release
+        script: |
+          flutter build ios --release \
+            --dart-define-from-file=env/prod.json \
+            --no-codesign
+
+      - name: Package IPA
+        script: |
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace ios/Runner.xcworkspace \
+            --scheme Runner
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - noreply@cartelplusadmin.com
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        submit_to_app_store: true
+        # Phased release — rolls out to 100% over 7 days
+        phased_release: true
+        beta_groups:
+          - Internal Testers
+
+
+  # ──────────────────────────────────────────────────────────────
+  # 5. ANDROID PRODUCTION — Play Store (main branch)
+  # ──────────────────────────────────────────────────────────────
+  android-production:
+    name: Android Production (Play Store)
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      android_signing:
+        - cartel_keystore
+      groups:
+        - google_play_credentials
+        - env_vars
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+    scripts:
+      - name: Set up prod env
+        script: |
+          cat > $CM_BUILD_DIR/env/prod.json << EOF
+          {
+            "ENV": "prod",
+            "SUPABASE_URL": "$SUPABASE_URL",
+            "SUPABASE_ANON_KEY": "$SUPABASE_ANON_KEY",
+            "STRIPE_PUBLISHABLE_KEY": "$STRIPE_PUBLISHABLE_KEY_LIVE"
+          }
+          EOF
+
+      - name: Get packages
+        script: flutter pub get
+
+      - name: Analyze
+        script: flutter analyze --fatal-infos
+
+      - name: Run tests
+        script: flutter test
+
+      - name: Set build number
+        script: |
+          BUILD_NUMBER=$(($(google-play get-latest-build-number \
+            --package-name io.cartel.app \
+            --tracks=production) + 1))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
+
+      - name: Build Android AAB
+        script: |
+          flutter build appbundle --release \
+            --build-number=$BUILD_NUMBER \
+            --dart-define-from-file=env/prod.json
+
+    artifacts:
+      - build/app/outputs/bundle/release/app-release.aab
+      - build/app/outputs/mapping/release/mapping.txt
+
+    publishing:
+      email:
+        recipients:
+          - noreply@cartelplusadmin.com
+        notify:
+          success: true
+          failure: true
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: production
+        # Rolls out to 10% of users first
+        rollout_fraction: 0.1
+        submit_as_draft: false

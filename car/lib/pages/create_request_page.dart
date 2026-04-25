@@ -20,6 +20,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   Color selectedColor = Colors.black;
   bool _isLoading = false;
   Map<String, dynamic>? _editingRequest;
+  String? _carDealId;
 
   String selectedMake = 'brand';
   final _modelController = TextEditingController();
@@ -40,9 +41,17 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     super.didChangeDependencies();
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (args != null && _editingRequest == null) {
-      _editingRequest = args;
-      
       final bool fromDetail = args['from_car_detail'] ?? false;
+      
+      if (!fromDetail) {
+        _editingRequest = args;
+        _carDealId = args['car_deal_id']?.toString();
+      } else {
+        final bool isDeal = args['is_deal'] == true;
+        if (isDeal) {
+          _carDealId = (args['car_deal_id'] ?? args['id'])?.toString();
+        }
+      }
       
       if (fromDetail) {
         // Pre-fill from car info
@@ -269,24 +278,57 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
         'exterior_color': colorNames[selectedColor]?[ts.currentLanguage] ?? ts.translate('custom'),
         'special_requirements': _requirementsController.text.trim(),
         'status': RequestStatus.initiated.dbValue,
+        if (_carDealId != null) 'car_deal_id': _carDealId,
       };
 
-      Map<String, dynamic> response;
+      debugPrint('Submitting request data: $data');
+      debugPrint('Current user ID: ${user.id}');
+
+      Map<String, dynamic>? response;
       if (_editingRequest != null) {
-        response = await _supabase
+        debugPrint('Updating request ID: ${_editingRequest!['id']}');
+        final updateResponse = await _supabase
             .schema('cartel')
             .from('requests')
             .update(data)
             .eq('id', _editingRequest!['id'])
-            .select()
-            .single();
+            .select();
+        
+        if (updateResponse.isNotEmpty) {
+          response = updateResponse.first;
+        }
       } else {
-        response = await _supabase
+        debugPrint('Inserting new request');
+        final insertResponse = await _supabase
             .schema('cartel')
             .from('requests')
             .insert({...data, 'payment_status': 'Pending'})
+            .select();
+        
+        if (insertResponse.isNotEmpty) {
+          response = insertResponse.first;
+        }
+      }
+
+      // 2. If response is null, try to fetch the latest request for this user
+      // This happens if RLS blocks the RETURNING clause but the row was inserted
+      if (response == null) {
+        debugPrint('Direct response was empty, attempting manual fetch...');
+        final manualFetch = await _supabase
+            .schema('cartel')
+            .from('requests')
             .select()
-            .single();
+            .eq('user_id', user.id)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        
+        response = manualFetch;
+        debugPrint('Manual fetch result: $response');
+      }
+
+      if (response == null) {
+        throw Exception('Request saved but could not be retrieved. Please check your internet connection or try again later.');
       }
 
       if (mounted) {

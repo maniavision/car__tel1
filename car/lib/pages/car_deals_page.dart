@@ -5,13 +5,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:car/services/translation_service.dart';
 
 class CarDealsPage extends StatefulWidget {
-  const CarDealsPage({super.key});
+  final SupabaseClient? supabaseClient;
+  const CarDealsPage({super.key, this.supabaseClient});
 
   @override
   State<CarDealsPage> createState() => _CarDealsPageState();
 }
 
 class _CarDealsPageState extends State<CarDealsPage> {
+  SupabaseClient get _supabase => widget.supabaseClient ?? Supabase.instance.client;
   final ts = TranslationService();
   List<Map<String, dynamic>> _carDeals = [];
   bool _isLoading = true;
@@ -24,7 +26,7 @@ class _CarDealsPageState extends State<CarDealsPage> {
 
   Future<void> _fetchCarDeals() async {
     try {
-      final response = await Supabase.instance.client
+      final response = await _supabase
           .schema('cartel')
           .from('car_deal')
           .select('*')

@@ -4,8 +4,8 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class StripeService {
-  static StripeService _instance = StripeService._internal();
-  factory StripeService() => _instance;
+  static StripeService? _instance;
+  factory StripeService() => _instance ??= StripeService._internal();
   StripeService._internal();
 
   @visibleForTesting
@@ -13,11 +13,18 @@ class StripeService {
     _instance = mock;
   }
 
+  SupabaseClient? _mockClient;
+
+  @visibleForTesting
+  set mockClient(SupabaseClient client) => _mockClient = client;
+
+  SupabaseClient get _supabase => _mockClient ?? Supabase.instance.client;
+
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
   Completer<void>? _initCompleter;
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool skipNative = false}) async {
     if (_isInitialized) return;
     
     if (_initCompleter != null) {
@@ -28,8 +35,8 @@ class StripeService {
 
     try {
       debugPrint('Initializing Stripe keys from Edge Function...');
-      final session = Supabase.instance.client.auth.currentSession;
-      final res = await Supabase.instance.client.functions.invoke(
+      final session = _supabase.auth.currentSession;
+      final res = await _supabase.functions.invoke(
         'get-stripe-key',
         body: {
           'name': 'Functions'
@@ -43,17 +50,28 @@ class StripeService {
       if (data != null && data['publishableKey'] != null) {
         Stripe.publishableKey = data['publishableKey'];
         Stripe.urlScheme = 'cartel';
-        await Stripe.instance.applySettings();
+        if (!skipNative) {
+          await Stripe.instance.applySettings();
+        }
         _isInitialized = true;
-        debugPrint('Stripe initialized successfully with key: ${Stripe.publishableKey!.substring(0, 8)}...');
+        debugPrint('Stripe initialized successfully with key: ${Stripe.publishableKey.substring(0, 8)}...');
       } else {
         debugPrint('Error: Stripe keys not found in Edge Function response');
       }
       _initCompleter!.complete();
     } catch (e) {
       debugPrint('Error initializing Stripe keys: $e');
-      _initCompleter!.completeError(e);
+      if (_initCompleter != null && !_initCompleter!.isCompleted) {
+        _initCompleter!.completeError(e);
+      }
       _initCompleter = null; // Allow retry on error
     }
+  }
+
+  @visibleForTesting
+  void reset() {
+    _isInitialized = false;
+    _initCompleter = null;
+    _mockClient = null;
   }
 }

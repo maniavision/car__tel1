@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TranslationService extends ChangeNotifier {
-  static TranslationService _instance = TranslationService._internal();
-  factory TranslationService() => _instance;
+  static TranslationService? _instance;
+  factory TranslationService() => _instance ??= TranslationService._internal();
   TranslationService._internal();
 
   @visibleForTesting
   static void setMockInstance(TranslationService mock) {
     _instance = mock;
   }
+
+  SupabaseClient? _mockClient;
+
+  @visibleForTesting
+  set mockClient(SupabaseClient client) => _mockClient = client;
+
+  SupabaseClient get _supabase => _mockClient ?? Supabase.instance.client;
 
   String _currentLanguage = 'Français';
   String get currentLanguage => _currentLanguage;
@@ -31,9 +38,9 @@ class TranslationService extends ChangeNotifier {
 
   Future<void> loadUserPreferences() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user != null) {
-        final response = await Supabase.instance.client
+        final response = await _supabase
             .schema('cartel')
             .from('profiles')
             .select('language_preference, currency_preference')
@@ -57,9 +64,9 @@ class TranslationService extends ChangeNotifier {
 
   Future<void> _syncWithDatabase() async {
     try {
-      final user = Supabase.instance.client.auth.currentUser;
+      final user = _supabase.auth.currentUser;
       if (user != null) {
-        await Supabase.instance.client
+        await _supabase
             .schema('cartel')
             .from('profiles')
             .update({
@@ -433,7 +440,7 @@ class TranslationService extends ChangeNotifier {
       'privacy_security': 'Security & Sharing',
       'privacy_security_body': 'CarTel never sells your data to third parties. We use advanced encryption protocols to ensure the integrity of your information.',
       'privacy_questions': 'Any questions?',
-      'privacy_contact_subtitle': 'Contact our data protection officer at support@cartel.app',
+      'privacy_contact_subtitle': 'Contact our data protection officer at contact@cartelplusadmin.com',
       'privacy_contact_btn': 'Contact Support',
       'privacy_copyright': '© 2023 CarTel Automobile. All rights reserved.',
     },
@@ -783,7 +790,7 @@ class TranslationService extends ChangeNotifier {
       'privacy_security': 'Sécurité & Partage',
       'privacy_security_body': 'CarTel ne vend jamais vos données à des tiers. Nous utilisons des protocoles de chiffrement avancés pour garantir l\'intégrité de vos informations.',
       'privacy_questions': 'Des questions ?',
-      'privacy_contact_subtitle': 'Contactez notre délégué à la protection des données via support@cartel.app',
+      'privacy_contact_subtitle': 'Contactez notre délégué à la protection des données via contact@cartelplusadmin.com',
       'privacy_contact_btn': 'Contacter le Support',
       'privacy_copyright': '© 2023 CarTel Automobile. Tous droits réservés.',
     },

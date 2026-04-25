@@ -118,10 +118,10 @@ void main() {
         home: SignUpPage(supabaseClient: mockClient),
       ));
 
-      expect(find.text('FULL_NAME'), findsOneWidget);
-      expect(find.text('EMAIL'), findsOneWidget);
-      expect(find.text('PASSWORD'), findsOneWidget);
-      expect(find.text('PHONE_NUMBER'), findsOneWidget);
+      expect(find.text('full_name'.toUpperCase()), findsOneWidget);
+      expect(find.text('email'.toUpperCase()), findsOneWidget);
+      expect(find.text('password'.toUpperCase()), findsOneWidget);
+      expect(find.text('phone_number'.toUpperCase()), findsOneWidget);
     }, createHttpClient: (context) => createMockHttpClient());
   });
 

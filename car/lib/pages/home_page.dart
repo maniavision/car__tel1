@@ -126,9 +126,9 @@ class _HomePageState extends State<HomePage> {
           .from('profiles')
           .select('full_name, avatar_url')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
-      if (mounted) {
+      if (mounted && response != null) {
         setState(() {
           _profileData = response;
         });

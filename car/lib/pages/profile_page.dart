@@ -40,16 +40,22 @@ class _ProfilePageState extends State<ProfilePage> {
           .from('profiles')
           .select('*, country:country_calling_codes(country_name, iso_alpha_2)')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
       if (mounted) {
-        setState(() {
-          _profileData = response;
-          _isLoadingProfile = false;
-        });
-        // Sync the translation service state with the profile data
-        if (response['language_preference'] != null) {
-          ts.loadUserPreferences();
+        if (response != null) {
+          setState(() {
+            _profileData = response;
+            _isLoadingProfile = false;
+          });
+          // Sync the translation service state with the profile data
+          if (response['language_preference'] != null) {
+            ts.loadUserPreferences();
+          }
+        } else {
+          setState(() {
+            _isLoadingProfile = false;
+          });
         }
       }
     } catch (e) {

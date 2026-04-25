@@ -182,7 +182,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                               ),
                               const SizedBox(height: 20),
                               GestureDetector(
-                                onTap: () => Navigator.pushNamed(context, '/chat', arguments: {'is_support': true}),
+                                onTap: () => Navigator.pushNamed(context, '/help-center'),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                                   decoration: BoxDecoration(

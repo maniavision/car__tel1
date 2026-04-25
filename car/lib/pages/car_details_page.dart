@@ -113,6 +113,19 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
     );
   }
 
+  Color _parseColor(String colorName) {
+    final name = colorName.toLowerCase();
+    if (name.contains('noir') || name.contains('black')) return Colors.black;
+    if (name.contains('blanc') || name.contains('white')) return Colors.white;
+    if (name.contains('argent') || name.contains('silver')) return const Color(0xFFC0C0C0);
+    if (name.contains('gris') || name.contains('grey')) return Colors.grey;
+    if (name.contains('bleu') || name.contains('blue')) return const Color(0xFF0000FF);
+    if (name.contains('rouge') || name.contains('red')) return const Color(0xFFFF0000);
+    if (name.contains('brun') || name.contains('brown') || name.contains('cuir') || name.contains('leather')) return const Color(0xFF3D2B1F);
+    if (name.contains('vert') || name.contains('green')) return const Color(0xFF008000);
+    return Colors.white10;
+  }
+
   Widget _buildContent(Map<String, dynamic> car, Color primaryColor, Color borderColor, Color mutedForeground, bool isMatch, List<String> images) {
     debugPrint('Car Data Map: $car');
     final year = car['year']?.toString() ?? '2022';
@@ -202,7 +215,7 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                       Text(
                         ts.formatPrice((car['strike_price'] ?? (car['final_price'] ?? 0) / 0.92).toDouble()),
                         style: GoogleFonts.montserrat(
-                          color: const Color(0xFF990000),
+                          color: Colors.red,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           decoration: TextDecoration.lineThrough,
@@ -251,9 +264,9 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildColorSpec(ts.translate('peinture_ext'), exteriorColor, Colors.grey)),
+              Expanded(child: _buildColorSpec(ts.translate('peinture_ext'), exteriorColor, _parseColor(exteriorColor))),
               const SizedBox(width: 12),
-              Expanded(child: _buildColorSpec(ts.translate('cuir_int'), interiorColor, const Color(0xFF3D2B1F))),
+              Expanded(child: _buildColorSpec(ts.translate('cuir_int'), interiorColor, _parseColor(interiorColor))),
             ],
           ),
           
@@ -740,7 +753,8 @@ class _CarDetailsPageState extends State<CarDetailsPage> {
                               'budget_min': args['price'],
                               'budget_max': args['final_price'],
                               'car_deal_id': carDealId,
-                              'status': 'Initiated'
+                              'status': 'Initiated',
+                              'payment_status': 'Pending'
                             });
 
                             if (mounted) {
